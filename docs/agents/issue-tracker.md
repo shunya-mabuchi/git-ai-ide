@@ -137,7 +137,7 @@ This file is the temporary issue tracker until GitHub Issues is connected.
 
 ## GAI-007: Create GitHub Repository And Push Initial MVP
 
-- Status: in-progress
+- Status: done
 - Labels: `type:infra`, `area:github`, `p0`
 - Owner: Codex
 - Context: The formal repository exists locally at `C:\Users\shuny\projects\git-ai-ide`, but GitHub does not show it because no remote repository has been created or pushed.
@@ -153,6 +153,6 @@ This file is the temporary issue tracker until GitHub Issues is connected.
   - `main` branch is pushed.
   - User can open the GitHub repository URL.
 - Verification:
-  - `git remote -v`
-  - `git status`
-  - `gh repo view` or equivalent.
+  - `git remote -v` shows `origin https://github.com/shunya-mabuchi/git-ai-ide.git`.
+  - `git status --short --branch` shows `main...origin/main`.
+  - GitHub repository URL: `https://github.com/shunya-mabuchi/git-ai-ide`.
