@@ -1092,6 +1092,21 @@ button {
   padding: 8px;
 }
 
+.diagnostic-log {
+  background: #0c1014;
+  border: 1px solid #263039;
+  border-radius: 6px;
+  color: #d6dee6;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 4px 0 0;
+  max-height: 120px;
+  overflow: auto;
+  padding: 8px;
+  white-space: pre-wrap;
+}
+
 .markdown-editor,
 .memory-editor {
   background: #101419;
