@@ -5,6 +5,15 @@ export type AiRuntimeStatus = {
   ollamaAvailable: boolean;
   recommendedProvider: "webllm" | "ollama" | "recorded";
   models: ModelCapability[];
+  providers: AiProviderHealth[];
+};
+
+export type AiProviderHealth = {
+  provider: "webllm" | "ollama" | "recorded";
+  status: "available" | "unavailable" | "checking";
+  label: string;
+  detail: string;
+  modelIds: string[];
 };
 
 export function recommendModelForTask(status: AiRuntimeStatus, task: AiTask): ModelCapability | undefined {
@@ -77,10 +86,143 @@ export function createDefaultRuntimeStatus(input?: Partial<AiRuntimeStatus>): Ai
   return {
     models: [recordedDemoModel, webLlmSmallModel, ollamaLocalModel],
     ollamaAvailable: false,
+    providers: [
+      {
+        detail: "モデル設定なしでもデモ workflow を再生できます。",
+        label: "利用可能",
+        modelIds: [recordedDemoModel.modelId],
+        provider: "recorded",
+        status: "available",
+      },
+      {
+        detail: "WebGPU capability check をまだ実行していません。",
+        label: "未確認",
+        modelIds: [],
+        provider: "webllm",
+        status: "checking",
+      },
+      {
+        detail: "localhost の Ollama 接続をまだ確認していません。",
+        label: "未確認",
+        modelIds: [],
+        provider: "ollama",
+        status: "checking",
+      },
+    ],
     recommendedProvider: "recorded",
     webGpuAvailable: false,
     ...input,
   };
+}
+
+export async function detectBrowserAiRuntime(input?: {
+  fetchImpl?: typeof fetch;
+  navigatorLike?: { gpu?: unknown };
+  ollamaBaseUrl?: string;
+  timeoutMs?: number;
+}): Promise<AiRuntimeStatus> {
+  const fetchImpl = input?.fetchImpl ?? globalThis.fetch;
+  const navigatorLike = input?.navigatorLike ?? (globalThis.navigator as { gpu?: unknown } | undefined);
+  const ollamaBaseUrl = input?.ollamaBaseUrl ?? "http://localhost:11434";
+  const timeoutMs = input?.timeoutMs ?? 1200;
+  const webGpuAvailable = Boolean(navigatorLike?.gpu);
+  const ollama = await detectOllama(fetchImpl, ollamaBaseUrl, timeoutMs);
+  const models = [
+    recordedDemoModel,
+    ...(webGpuAvailable ? [webLlmSmallModel] : []),
+    ...(ollama.available
+      ? [
+          {
+            ...ollamaLocalModel,
+            modelId: ollama.modelIds[0] ?? ollamaLocalModel.modelId,
+          },
+        ]
+      : []),
+  ];
+
+  return createDefaultRuntimeStatus({
+    models,
+    ollamaAvailable: ollama.available,
+    providers: [
+      {
+        detail: "モデル設定なしでもデモ workflow を再生できます。",
+        label: "利用可能",
+        modelIds: [recordedDemoModel.modelId],
+        provider: "recorded",
+        status: "available",
+      },
+      {
+        detail: webGpuAvailable
+          ? "WebGPU を検出しました。WebLLM loading boundary に進めます。"
+          : "WebGPU を検出できません。WebLLM はこの端末では fallback 扱いです。",
+        label: webGpuAvailable ? "利用可能" : "WebGPU なし",
+        modelIds: webGpuAvailable ? [webLlmSmallModel.modelId] : [],
+        provider: "webllm",
+        status: webGpuAvailable ? "available" : "unavailable",
+      },
+      {
+        detail: ollama.detail,
+        label: ollama.available ? "接続済み" : "未接続",
+        modelIds: ollama.modelIds,
+        provider: "ollama",
+        status: ollama.available ? "available" : "unavailable",
+      },
+    ],
+    recommendedProvider: ollama.available ? "ollama" : webGpuAvailable ? "webllm" : "recorded",
+    webGpuAvailable,
+  });
+}
+
+async function detectOllama(fetchImpl: typeof fetch | undefined, baseUrl: string, timeoutMs: number) {
+  if (!fetchImpl) {
+    return {
+      available: false,
+      detail: "fetch API を利用できないため Ollama を確認できません。",
+      modelIds: [] as string[],
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(`${baseUrl}/api/tags`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return {
+        available: false,
+        detail: `Ollama は応答しましたが HTTP ${response.status} を返しました。`,
+        modelIds: [] as string[],
+      };
+    }
+
+    const payload = (await response.json()) as { models?: Array<{ name?: string; model?: string }> };
+    const modelIds =
+      payload.models
+        ?.map((model) => model.name ?? model.model)
+        .filter((modelId): modelId is string => Boolean(modelId)) ?? [];
+
+    return {
+      available: true,
+      detail: modelIds.length > 0 ? `${modelIds.length} 件の local model を検出しました。` : "Ollama は起動していますが model は未取得です。",
+      modelIds,
+    };
+  } catch (error) {
+    const aborted = error instanceof DOMException && error.name === "AbortError";
+
+    return {
+      available: false,
+      detail: aborted
+        ? "Ollama の応答が timeout しました。Recorded AI に fallback します。"
+        : "localhost:11434 に接続できません。Recorded AI に fallback します。",
+      modelIds: [] as string[],
+    };
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
 }
 
 export function chooseExecutionMode(input: {

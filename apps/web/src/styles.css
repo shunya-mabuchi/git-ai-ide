@@ -853,6 +853,10 @@ button {
   box-shadow: inset 2px 0 0 #6fb3d2;
 }
 
+.runtime-card-unavailable {
+  border-color: #4a2f35;
+}
+
 .runtime-card strong,
 .routing-note strong {
   color: #eef3f6;
@@ -860,10 +864,23 @@ button {
 }
 
 .runtime-card span,
+.runtime-card small,
 .routing-note span {
   color: #9aa6b2;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.runtime-card small {
+  color: #7fda9b;
+}
+
+.runtime-card-unavailable small {
+  color: #e39b8f;
+}
+
+.runtime-card-checking small {
+  color: #d7c47a;
 }
 
 .routing-note {
