@@ -19,7 +19,7 @@ import {
 import type { PointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
-import { createDefaultRuntimeStatus, detectBrowserAiRuntime, generatePatchProposal, planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
+import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson, requestPatchProposal } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
 import { evaluateSafetyGate, type PatchProposal } from "@git-ai-ide/shared";
@@ -364,14 +364,16 @@ export function App() {
     setDiffOpen(true);
   };
 
-  const generateAiPatchProposal = () => {
+  const generateAiPatchProposal = async () => {
     setPatchGenerationState("running");
-    const result = generatePatchProposal({
+    const result = await requestPatchProposal({
+      allowedFiles: [selectedFile],
       branchGoalMarkdown,
       currentFile: {
         content: currentFile,
         path: selectedFile,
       },
+      modelId: selectedRuntimeHealth?.modelIds[0],
       mode: aiRuntimeMode,
     });
 
