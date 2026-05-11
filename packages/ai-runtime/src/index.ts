@@ -43,6 +43,13 @@ export type PatchProposalRequest = {
   mode: AiExecutionMode;
 };
 
+export type LlmPatchProposalParseRequest = {
+  allowedFiles?: string[];
+  branchGoalMarkdown: string;
+  mode: AiExecutionMode;
+  rawText: string;
+};
+
 export type PatchProposalResult =
   | {
       ok: true;
@@ -396,6 +403,41 @@ export function generatePatchProposal(request: PatchProposalRequest): PatchPropo
   };
 }
 
+export function parseLlmPatchProposal(request: LlmPatchProposalParseRequest): PatchProposalResult {
+  const parsed = parseJsonObject(request.rawText);
+
+  if (!parsed.ok) {
+    return {
+      error: parsed.error,
+      mode: request.mode,
+      ok: false,
+      warnings: ["LLM には JSON object だけを返すよう再依頼してください。"],
+    };
+  }
+
+  const validation = validatePatchProposalCandidate(parsed.value, {
+    allowedFiles: request.allowedFiles,
+    branchGoalAttached: Boolean(request.branchGoalMarkdown.trim()),
+    mode: request.mode,
+  });
+
+  if (!validation.ok) {
+    return {
+      error: validation.error,
+      mode: request.mode,
+      ok: false,
+      warnings: validation.warnings,
+    };
+  }
+
+  return {
+    mode: request.mode,
+    ok: true,
+    proposal: validation.proposal,
+    warnings: validation.warnings,
+  };
+}
+
 export function planRuntimeFromPackageJson(files: Record<string, string>): RuntimePlan {
   const packageJson = files["package.json"];
 
@@ -447,4 +489,127 @@ function extractMarkdownTitle(markdown: string) {
     .find((line) => line.startsWith("# "))
     ?.replace(/^# /, "")
     .trim();
+}
+
+function parseJsonObject(rawText: string): { ok: true; value: unknown } | { ok: false; error: string } {
+  const trimmed = rawText.trim();
+  const jsonText = extractJsonObjectText(trimmed);
+
+  if (!jsonText) {
+    return { error: "LLM response に JSON object が見つかりませんでした。", ok: false };
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(jsonText) as unknown };
+  } catch {
+    return { error: "LLM response の JSON を解析できませんでした。", ok: false };
+  }
+}
+
+function extractJsonObjectText(text: string) {
+  if (text.startsWith("{") && text.endsWith("}")) return text;
+
+  const fencedJson = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  if (fencedJson?.startsWith("{") && fencedJson.endsWith("}")) return fencedJson;
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return text.slice(firstBrace, lastBrace + 1);
+  }
+
+  return "";
+}
+
+function validatePatchProposalCandidate(
+  candidate: unknown,
+  input: { allowedFiles?: string[]; branchGoalAttached: boolean; mode: AiExecutionMode },
+):
+  | { ok: true; proposal: PatchProposal; warnings: string[] }
+  | { ok: false; error: string; warnings: string[] } {
+  if (!isRecord(candidate)) {
+    return { error: "Patch Proposal は object である必要があります。", ok: false, warnings: [] };
+  }
+
+  const title = readString(candidate, "title");
+  const summary = readString(candidate, "summary");
+  const edits = candidate.edits;
+
+  if (!title || !summary) {
+    return { error: "Patch Proposal には title と summary が必要です。", ok: false, warnings: [] };
+  }
+
+  if (!Array.isArray(edits) || edits.length === 0) {
+    return { error: "Patch Proposal には 1 件以上の edits が必要です。", ok: false, warnings: [] };
+  }
+
+  const allowedFiles = input.allowedFiles ? new Set(input.allowedFiles) : undefined;
+  const normalizedEdits = [];
+
+  for (const edit of edits) {
+    if (!isRecord(edit)) {
+      return { error: "Structured edit は object である必要があります。", ok: false, warnings: [] };
+    }
+
+    const file = readString(edit, "file");
+    const operation = readString(edit, "operation");
+    const find = readString(edit, "find");
+    const replacement = readString(edit, "replacement");
+    const reason = readString(edit, "reason");
+
+    if (!file || !operation || !find || !replacement || !reason) {
+      return { error: "Structured edit には file / operation / find / replacement / reason が必要です。", ok: false, warnings: [] };
+    }
+
+    if (operation !== "replace") {
+      return { error: `Unsupported operation: ${operation}`, ok: false, warnings: [] };
+    }
+
+    if (allowedFiles && !allowedFiles.has(file)) {
+      return { error: `許可されていない file path への edit です: ${file}`, ok: false, warnings: [] };
+    }
+
+    normalizedEdits.push({
+      file,
+      find,
+      operation: "replace" as const,
+      reason,
+      replacement,
+    });
+  }
+
+  return {
+    ok: true,
+    proposal: {
+      edits: normalizedEdits,
+      id: readString(candidate, "id") || `llm-patch-${Date.now()}`,
+      safety: {
+        branchGoalAttached: input.branchGoalAttached,
+        contextPackReviewed: true,
+        diffPreviewGenerated: true,
+        gitDiffUpdated: false,
+        modelCapabilityAccepted: input.mode !== "webllm",
+        structuredEditParsed: true,
+        targetFileExists: true,
+        targetTextMatched: false,
+        testsRun: false,
+      },
+      status: "ready",
+      summary,
+      title,
+    },
+    warnings:
+      input.mode === "webllm"
+        ? ["WebLLM response は小さなモデルの出力として扱い、diff review を必須にしてください。"]
+        : [],
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value.trim() : "";
 }

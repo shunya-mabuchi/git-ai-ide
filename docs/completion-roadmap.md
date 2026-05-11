@@ -24,7 +24,7 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
   - Recorded AI / WebLLM / Ollama の provider 境界をそろえる
   - LLM 出力を structured edit schema で検証する
   - patch queue に追加し、diff review 後だけ適用できるようにする
-  - 残り: WebLLM / Ollama の実レスポンスを schema validation に通す
+  - 残り: WebLLM / Ollama の実 API 呼び出しを schema validation に接続する
 
 ### 3. Search / Editor の実用補強
 
