@@ -584,22 +584,40 @@ button {
   border-bottom: 1px solid #2a2f36;
   display: flex;
   min-width: 0;
+  overflow-x: auto;
 }
 
 .tab {
+  align-items: center;
   background: #1f242b;
   border: 0;
   border-right: 1px solid #2f3740;
   color: #cbd4dc;
   cursor: default;
+  display: inline-flex;
   font-size: 12px;
+  gap: 8px;
   height: 34px;
-  max-width: 520px;
+  max-width: 220px;
+  min-width: 120px;
   overflow: hidden;
   padding: 0 12px;
   text-align: left;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab svg {
+  color: #8f9aa6;
+  flex: 0 0 auto;
+}
+
+.tab svg:hover {
+  color: #eef3f6;
 }
 
 .tab.active {

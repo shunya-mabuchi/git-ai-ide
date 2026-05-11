@@ -79,6 +79,7 @@ const demoGitHubRepository: GitHubRepositoryOption = {
 
 export function App() {
   const [selectedFile, setSelectedFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
+  const [openFiles, setOpenFiles] = useState<FileName[]>(["src/features/pr-summary/generateSummary.ts"]);
   const [files, setFiles] = useState<Record<string, string>>(demoFiles);
   const [baselineFiles, setBaselineFiles] = useState<Record<string, string>>(demoFiles);
   const [workspaceName, setWorkspaceName] = useState("PR Helper Mini");
@@ -227,8 +228,9 @@ export function App() {
         setBaselineFiles(snapshot.files);
         setWorkspaceName(snapshot.name);
         setWorkspaceSource(snapshot.source);
-        setSelectedFile(selectPreferredFile(snapshot.files));
-        setDiffFile(selectPreferredFile(snapshot.files));
+        const preferredFile = selectPreferredFile(snapshot.files);
+        openFile(preferredFile);
+        setDiffFile(preferredFile);
         setWorkspaceRestored(true);
       })
       .catch(() => {
@@ -331,7 +333,7 @@ export function App() {
       return;
     }
 
-    setSelectedFile(primaryEdit.file);
+    openFile(primaryEdit.file);
     setDiffFile(primaryEdit.file);
     setDiffMode("patch");
     setDiffOpen(true);
@@ -341,9 +343,33 @@ export function App() {
     setDiffFile(file);
     setDiffMode("file");
     if (file in files) {
-      setSelectedFile(file);
+      openFile(file);
     }
     setDiffOpen(true);
+  };
+
+  const openFile = (file: FileName) => {
+    if (!file) return;
+    setSelectedFile(file);
+    setOpenFiles((currentFiles) => (currentFiles.includes(file) ? currentFiles : [...currentFiles, file]));
+  };
+
+  const closeFileTab = (file: FileName) => {
+    setOpenFiles((currentFiles) => {
+      if (currentFiles.length <= 1) return currentFiles;
+      const fileIndex = currentFiles.indexOf(file);
+      const nextFiles = currentFiles.filter((currentFileName) => currentFileName !== file);
+
+      if (file === selectedFile) {
+        const fallbackFile = nextFiles[Math.max(0, fileIndex - 1)] ?? nextFiles[0];
+        if (fallbackFile) {
+          setSelectedFile(fallbackFile);
+          setDiffOpen(false);
+        }
+      }
+
+      return nextFiles;
+    });
   };
 
   const toggleSidePanel = (mode: SidePanelMode) => {
@@ -453,8 +479,10 @@ export function App() {
       setBaselineFiles(snapshot.files);
       setWorkspaceName(snapshot.name);
       setWorkspaceSource(snapshot.source);
-      setSelectedFile(selectPreferredFile(snapshot.files));
-      setDiffFile(selectPreferredFile(snapshot.files));
+      const preferredFile = selectPreferredFile(snapshot.files);
+      openFile(preferredFile);
+      setOpenFiles([preferredFile]);
+      setDiffFile(preferredFile);
       setDiffOpen(false);
       setPatchApplied(false);
       setTestsRun(false);
@@ -478,7 +506,8 @@ export function App() {
     setBaselineFiles(demoFiles);
     setWorkspaceName("PR Helper Mini");
     setWorkspaceSource("demo");
-    setSelectedFile("src/features/pr-summary/generateSummary.ts");
+    openFile("src/features/pr-summary/generateSummary.ts");
+    setOpenFiles(["src/features/pr-summary/generateSummary.ts"]);
     setDiffFile("src/features/pr-summary/generateSummary.ts");
     setDiffOpen(false);
     setPatchApplied(false);
@@ -700,7 +729,7 @@ export function App() {
                         expandedFolders={expandedFolders}
                         nodes={explorerTree}
                         onSelectFile={(file) => {
-                          setSelectedFile(file);
+                          openFile(file);
                           setDiffOpen(false);
                         }}
                         onToggleFolder={(folder) => {
@@ -872,7 +901,31 @@ export function App() {
           </div>
 
           <div className="editor-tabs">
-            <button className="tab active">{diffOpen ? `Diff: ${activeDiffFile}` : selectedFile}</button>
+            {diffOpen ? (
+              <button className="tab active">
+                Diff: {activeDiffFile}
+                <X size={13} onClick={() => setDiffOpen(false)} />
+              </button>
+            ) : null}
+            {openFiles.map((file) => (
+              <button
+                className={!diffOpen && file === selectedFile ? "tab active" : "tab"}
+                key={file}
+                onClick={() => {
+                  setSelectedFile(file);
+                  setDiffOpen(false);
+                }}
+              >
+                <span>{basename(file)}</span>
+                <X
+                  size={13}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    closeFileTab(file);
+                  }}
+                />
+              </button>
+            ))}
           </div>
 
           <div className="editor-surface">
@@ -1307,6 +1360,10 @@ function languageForFile(fileName: string) {
   if (fileName.endsWith(".json")) return "json";
   if (fileName.endsWith(".md")) return "markdown";
   return "plaintext";
+}
+
+function basename(fileName: string) {
+  return fileName.split("/").at(-1) ?? fileName;
 }
 
 function selectPreferredFile(files: Record<string, string>) {
