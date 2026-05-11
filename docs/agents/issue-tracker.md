@@ -342,3 +342,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で AI patch 生成と Diff preview 表示を確認
   - PR は GitHub issue #19 に `Closes #19` で紐づける
   - PR #20 を merge 済み
+
+## GAI-016: 検索結果から該当行へジャンプできるようにする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/21
+- 背景: Search パネルはファイル名と本文を検索できるが、結果クリック後に該当行へ移動できない。IDE として検索結果からすぐコード位置へ移動できる必要がある。
+- スコープ:
+  - Search result に line target を保持する
+  - Monaco editor で該当行へ reveal / focus する
+  - file tab と search click の連携を壊さない
+  - filename match は 1 行目へ移動する
+- 受け入れ条件:
+  - 本文検索結果をクリックすると該当 file が開く
+  - editor が該当 line を中央付近に表示する
+  - filename match では file の 1 行目へ移動する
+  - typecheck / build / browser 確認が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で検索結果クリック後に該当行が表示されることを確認
+  - PR は GitHub issue #21 に `Closes #21` で紐づける
+  - PR #22 を merge 済み

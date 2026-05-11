@@ -17,8 +17,8 @@ import {
   X,
 } from "lucide-react";
 import type { PointerEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
-import Editor, { DiffEditor } from "@monaco-editor/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { createDefaultRuntimeStatus, detectBrowserAiRuntime, generatePatchProposal, planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
@@ -85,8 +85,10 @@ const demoGitHubRepository: GitHubRepositoryOption = {
 };
 
 export function App() {
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const [selectedFile, setSelectedFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
   const [openFiles, setOpenFiles] = useState<FileName[]>(["src/features/pr-summary/generateSummary.ts"]);
+  const [editorTarget, setEditorTarget] = useState<{ file: FileName; line: number } | null>(null);
   const [files, setFiles] = useState<Record<string, string>>(demoFiles);
   const [baselineFiles, setBaselineFiles] = useState<Record<string, string>>(demoFiles);
   const [workspaceName, setWorkspaceName] = useState("PR Helper Mini");
@@ -270,6 +272,11 @@ export function App() {
     });
   }, [files, workspaceName, workspaceSource]);
 
+  useEffect(() => {
+    if (!editorTarget || editorTarget.file !== selectedFile || diffOpen) return;
+    revealEditorLine(editorRef.current, editorTarget.line);
+  }, [diffOpen, editorTarget, selectedFile]);
+
   const fileNames = useMemo(() => Object.keys(files).sort(), [files]);
   const explorerTree = useMemo(() => buildExplorerTree(fileNames), [fileNames]);
   const searchResults = useMemo(() => searchWorkspace(files, searchQuery), [files, searchQuery]);
@@ -405,6 +412,19 @@ export function App() {
     if (!file) return;
     setSelectedFile(file);
     setOpenFiles((currentFiles) => (currentFiles.includes(file) ? currentFiles : [...currentFiles, file]));
+  };
+
+  const openFileAtLine = (file: FileName, line: number) => {
+    openFile(file);
+    setEditorTarget({ file, line });
+    setDiffOpen(false);
+  };
+
+  const handleEditorMount: OnMount = (editor) => {
+    editorRef.current = editor;
+    if (editorTarget?.file === selectedFile && !diffOpen) {
+      revealEditorLine(editor, editorTarget.line);
+    }
   };
 
   const closeFileTab = (file: FileName) => {
@@ -861,8 +881,7 @@ export function App() {
                             className={result.file === selectedFile ? "search-result active" : "search-result"}
                             key={`${result.file}:${result.matchType}:${result.line}:${result.preview}`}
                             onClick={() => {
-                              openFile(result.file);
-                              setDiffOpen(false);
+                              openFileAtLine(result.file, result.line);
                             }}
                           >
                             <span className="search-result-heading">
@@ -1081,6 +1100,7 @@ export function App() {
                   key={selectedFile}
                   language={languageForFile(selectedFile)}
                   onChange={updateCurrentFile}
+                  onMount={handleEditorMount}
                   options={monacoEditorOptions}
                   path={selectedFile}
                   theme="vs-dark"
@@ -1547,6 +1567,15 @@ function searchWorkspace(files: Record<string, string>, query: string): SearchRe
 
 function canUsePreviewFrame(capability: string) {
   return capability === "webcontainer";
+}
+
+function revealEditorLine(editor: Parameters<OnMount>[0] | null, line: number) {
+  if (!editor) return;
+
+  const lineNumber = Math.max(1, line);
+  editor.revealLineInCenter(lineNumber);
+  editor.setPosition({ column: 1, lineNumber });
+  editor.focus();
 }
 
 function clamp(value: number, min: number, max: number) {
