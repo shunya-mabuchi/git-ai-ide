@@ -125,7 +125,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-006: WebContainer で test/typecheck を実行する
 
-- 状態: レビュー中
+- 状態: 完了
 - ラベル: `種別:機能`, `領域:runtime`, `優先度:p2`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/3
@@ -144,6 +144,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm -r typecheck` 成功
   - `pnpm --filter @git-ai-ide/web build` 成功
   - PR は GitHub issue #3 に `Closes #3` で紐づける
+  - PR #6 を merge 済み
 
 ## GAI-008: Markdown ドキュメントを日本語へ統一する
 
@@ -165,3 +166,25 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - 検証:
   - Markdown 見出し確認済み
   - `pnpm -r typecheck` 成功
+
+## GAI-009: GitHub App installation と repo 選択 flow を整える
+
+- 状態: レビュー中
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/7
+- 背景: Worker は GitHub App 設定済みの場合、`/api/github/repos` に `installation_id` を要求している。一方で Web UI は installation 一覧を取得せずに repo 一覧を読みに行くため、実 GitHub App 接続時の selected repo flow が成立しない。
+- スコープ:
+  - Web client に installation 一覧取得を追加する
+  - 選択 installation に紐づく repo 一覧を取得する
+  - UI で installation / repository を選べるようにする
+  - demo mode の fallback は維持する
+- 受け入れ条件:
+  - GitHub App configured 時に installation を選択できる
+  - 選択 installation の repository だけが選択肢に出る
+  - demo mode では従来通り `demo/pr-helper-mini` が使える
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - demo mode browser 確認成功
+  - PR は GitHub issue #7 に `Closes #7` で紐づける

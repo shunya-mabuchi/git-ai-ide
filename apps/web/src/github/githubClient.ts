@@ -12,6 +12,11 @@ export type GitHubRepositoryOption = {
   owner: string;
 };
 
+export type GitHubInstallationOption = {
+  accountLogin: string;
+  id: number;
+};
+
 export type CreatePullRequestInput = {
   baseBranch: string;
   body: string;
@@ -60,8 +65,18 @@ export async function loadGitHubSetup(): Promise<GitHubSetupStatus> {
   return response.json();
 }
 
-export async function loadGitHubRepositories(): Promise<GitHubRepositoryOption[]> {
-  const response = await fetch(`${workerBaseUrl}/api/github/repos`);
+export async function loadGitHubInstallations(): Promise<GitHubInstallationOption[]> {
+  const response = await fetch(`${workerBaseUrl}/api/github/installations`);
+  if (!response.ok) throw new Error("GitHub installations を取得できませんでした。");
+  const body = (await response.json()) as {
+    installations: GitHubInstallationOption[];
+  };
+  return body.installations;
+}
+
+export async function loadGitHubRepositories(installationId?: number): Promise<GitHubRepositoryOption[]> {
+  const params = installationId ? `?installation_id=${installationId}` : "";
+  const response = await fetch(`${workerBaseUrl}/api/github/repos${params}`);
   if (!response.ok) throw new Error("GitHub repositories を取得できませんでした。");
   const body = (await response.json()) as {
     repositories: GitHubRepositoryOption[];

@@ -22,9 +22,11 @@ import { evaluateSafetyGate } from "@git-ai-ide/shared";
 import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
+  loadGitHubInstallations,
   loadGitHubRepositories,
   loadGitHubSetup,
   pushGitHubFiles,
+  type GitHubInstallationOption,
   type GitHubRepositoryOption,
 } from "./github/githubClient";
 import {
@@ -56,6 +58,13 @@ const aiMessages = [
       "generateSummary.ts 向けに構造化された編集案を作りました。変更対象は 1 関数だけで、適用前に diff review が必要です。",
   },
 ];
+
+const demoGitHubRepository: GitHubRepositoryOption = {
+  defaultBranch: "main",
+  fullName: "demo/pr-helper-mini",
+  name: "pr-helper-mini",
+  owner: "demo",
+};
 
 export function App() {
   const [selectedFile, setSelectedFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
@@ -91,10 +100,12 @@ export function App() {
   const [pushedCommitSha, setPushedCommitSha] = useState("");
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [githubInstallUrl, setGithubInstallUrl] = useState("");
+  const [githubInstallations, setGithubInstallations] = useState<GitHubInstallationOption[]>([]);
   const [githubRepositories, setGithubRepositories] = useState<GitHubRepositoryOption[]>([]);
   const [selectedRepository, setSelectedRepository] = useState("demo/pr-helper-mini");
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
+  const [isLoadingGitHubRepositories, setIsLoadingGitHubRepositories] = useState(false);
   const [isPushingBranch, setIsPushingBranch] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
@@ -104,6 +115,15 @@ export function App() {
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
   );
+
+  const applyGitHubRepositories = (repositories: GitHubRepositoryOption[]) => {
+    setGithubRepositories(repositories);
+    const firstRepository = repositories[0];
+    if (firstRepository) {
+      setSelectedRepository(firstRepository.fullName);
+      setSelectedInstallationId(firstRepository.installationId);
+    }
+  };
 
   useEffect(() => {
     if (window.innerWidth < 1180) {
@@ -138,29 +158,45 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([loadGitHubSetup(), loadGitHubRepositories()])
-      .then(([setup, repositories]) => {
+    loadGitHubSetup()
+      .then(async (setup) => {
         if (cancelled) return;
         setGithubConfigured(setup.appConfigured);
         setGithubInstallUrl(setup.installUrl);
-        setGithubRepositories(repositories);
-        const firstRepository = repositories[0];
-        if (firstRepository) {
-          setSelectedRepository(firstRepository.fullName);
-          setSelectedInstallationId(firstRepository.installationId);
+
+        if (!setup.appConfigured) {
+          const repositories = await loadGitHubRepositories();
+          if (cancelled) return;
+          applyGitHubRepositories(repositories);
+          setGithubStatusMessage("Demo mode: GitHub secrets 未設定");
+          return;
         }
-        setGithubStatusMessage(setup.appConfigured ? "GitHub App configured" : "Demo mode: GitHub secrets 未設定");
+
+        const installations = await loadGitHubInstallations();
+        if (cancelled) return;
+        setGithubInstallations(installations);
+
+        const firstInstallation = installations[0];
+        if (!firstInstallation) {
+          setGithubRepositories([]);
+          setSelectedInstallationId(undefined);
+          setGithubStatusMessage("GitHub App configured / installation 未検出");
+          return;
+        }
+
+        setSelectedInstallationId(firstInstallation.id);
+        setIsLoadingGitHubRepositories(true);
+        const repositories = await loadGitHubRepositories(firstInstallation.id);
+        if (cancelled) return;
+        setIsLoadingGitHubRepositories(false);
+        setGithubRepositories(repositories);
+        applyGitHubRepositories(repositories);
+        setGithubStatusMessage(`GitHub App configured / ${firstInstallation.accountLogin}`);
       })
       .catch(() => {
         if (cancelled) return;
-        setGithubRepositories([
-          {
-            defaultBranch: "main",
-            fullName: "demo/pr-helper-mini",
-            name: "pr-helper-mini",
-            owner: "demo",
-          },
-        ]);
+        applyGitHubRepositories([demoGitHubRepository]);
+        setIsLoadingGitHubRepositories(false);
         setGithubStatusMessage("Worker 未起動: demo mode fallback");
       });
 
@@ -318,6 +354,25 @@ export function App() {
     setBranchPushed(false);
     setCreatedPrUrl("");
     setDiffOpen(false);
+  };
+
+  const selectGitHubInstallation = async (installationId: number) => {
+    setSelectedInstallationId(installationId);
+    setIsLoadingGitHubRepositories(true);
+    setGithubStatusMessage("Repository を読み込み中");
+
+    try {
+      const repositories = await loadGitHubRepositories(installationId);
+      applyGitHubRepositories(repositories);
+      const installation = githubInstallations.find((item) => item.id === installationId);
+      setSelectedInstallationId(installationId);
+      setGithubStatusMessage(`GitHub App configured / ${installation?.accountLogin ?? installationId}`);
+    } catch (error) {
+      setGithubRepositories([]);
+      setGithubStatusMessage(error instanceof Error ? error.message : "GitHub repositories を取得できませんでした。");
+    } finally {
+      setIsLoadingGitHubRepositories(false);
+    }
   };
 
   const runWorkspaceChecks = async () => {
@@ -727,9 +782,28 @@ export function App() {
                   </div>
                   <div className="github-box">
                     <strong>GitHub Integration</strong>
+                    {githubConfigured ? (
+                      <label className="repo-select">
+                        <span>Installation</span>
+                        <select
+                          disabled={githubInstallations.length === 0 || isLoadingGitHubRepositories}
+                          value={selectedInstallationId ?? ""}
+                          onChange={(event) => {
+                            void selectGitHubInstallation(Number(event.target.value));
+                          }}
+                        >
+                          {githubInstallations.map((installation) => (
+                            <option key={installation.id} value={installation.id}>
+                              {installation.accountLogin}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <label className="repo-select">
                       <span>Repository</span>
                       <select
+                        disabled={githubRepositories.length === 0 || isLoadingGitHubRepositories}
                         value={selectedRepository}
                         onChange={(event) => {
                           const repository = githubRepositories.find((item) => item.fullName === event.target.value);
@@ -745,6 +819,7 @@ export function App() {
                       </select>
                     </label>
                     <span>{githubConfigured ? "GitHub App configured" : "Demo mode"}</span>
+                    {isLoadingGitHubRepositories ? <span>Repository を読み込み中</span> : null}
                     <span>{githubStatusMessage}</span>
                     {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : null}
                     <span>{branchPushed ? "branch pushed" : "push pending"}</span>
