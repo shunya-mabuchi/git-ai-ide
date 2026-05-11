@@ -192,7 +192,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-010: Explorer をフォルダ階層表示にする
 
-- 状態: レビュー中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/9
@@ -212,3 +212,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - browser で Explorer tree 表示確認済み
   - PR は GitHub issue #9 に `Closes #9` で紐づける
+  - PR #10 を merge 済み
+
+## GAI-011: Editor tabs で複数ファイルを切り替えられるようにする
+
+- 状態: レビュー中
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/11
+- 背景: 中央 editor は現在 1 つの active tab だけを表示している。Explorer で複数ファイルを見比べる IDE 体験として、開いたファイルが tab として残り、切り替えや close ができる必要がある。
+- スコープ:
+  - 開いた file を editor tabs に追加する
+  - tab クリックで selected file を切り替える
+  - tab close に対応する
+  - active tab を視覚的に表示する
+  - diff preview 中は diff tab と file tabs の関係が崩れないようにする
+- 受け入れ条件:
+  - Explorer から複数 file を開くと複数 tab が表示される
+  - tab をクリックすると editor の内容が切り替わる
+  - active でない tab を close できる
+  - active tab を close した場合は隣の tab に切り替わる
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で複数 tab open / switch 表示を確認
+  - PR は GitHub issue #11 に `Closes #11` で紐づける
