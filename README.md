@@ -24,6 +24,7 @@ Git AI IDE は、Git の Branch to PR workflow を安全に進めるための AI
 - test/typecheck command の Runtime Plan
 - GitHub repository / PR helper flow のための Cloudflare Worker API boundary
 - workflow metadata のみを保存する Cloudflare D1 schema
+- Local Preview の script 検出と fallback 表示
 
 ## アーキテクチャ方針
 
@@ -74,4 +75,5 @@ D1 は Branch to PR workflow metadata のみを保存します。
 - [面接用アピール資料](git-ai-ide_interview_notes.md)
 - [プロジェクト案](portfolio_project_ideas.md)
 - [MVP 実装状況](docs/mvp-implementation-status.md)
+- [完成までの残り機能](docs/completion-roadmap.md)
 - [GitHub App セットアップ](docs/github-app-setup.md)

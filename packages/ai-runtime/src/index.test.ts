@@ -60,13 +60,19 @@ describe("planRuntimeFromPackageJson", () => {
       planRuntimeFromPackageJson({
         "package.json": JSON.stringify({
           scripts: {
+            build: "vite build",
+            dev: "vite --host 0.0.0.0",
+            preview: "vite preview",
             test: "vitest run",
             typecheck: "tsc --noEmit",
           },
         }),
       }),
     ).toMatchObject({
+      buildCommand: "npm run build",
+      devCommand: "npm run dev",
       installCommand: "npm install",
+      previewCommand: "npm run preview",
       testCommand: "npm run test",
       typecheckCommand: "npm run typecheck",
     });

@@ -288,11 +288,17 @@ export function planRuntimeFromPackageJson(files: Record<string, string>): Runti
 
     return {
       capability: "webcontainer",
-      confidence: scripts.test || scripts.typecheck ? "high" : "medium",
+      confidence: scripts.dev || scripts.preview || scripts.test || scripts.typecheck ? "high" : "medium",
+      buildCommand: scripts.build ? `${packageManager} run build` : undefined,
+      devCommand: scripts.dev ? `${packageManager} run dev` : undefined,
       installCommand: `${packageManager} install`,
+      previewCommand: scripts.preview ? `${packageManager} run preview` : undefined,
       testCommand: scripts.test ? `${packageManager} run test` : undefined,
       typecheckCommand: scripts.typecheck ? `${packageManager} run typecheck` : undefined,
-      warnings: scripts.test ? [] : ["test script が見つかりません。"],
+      warnings: [
+        ...(!scripts.dev && !scripts.preview ? ["dev / preview script が見つかりません。"] : []),
+        ...(!scripts.test ? ["test script が見つかりません。"] : []),
+      ],
     };
   } catch {
     return {

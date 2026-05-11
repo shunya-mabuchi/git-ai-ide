@@ -262,3 +262,30 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で Search panel の検索結果表示と file open を確認
   - PR は GitHub issue #13 に `Closes #13` で紐づける
   - PR #14 を merge 済み
+
+## GAI-013: Local Preview で変更後のアプリを確認できるようにする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/15
+- 背景: IDE として変更後の動作確認ができないと、AI patch workflow のありがたみが弱い。diff / test だけでなく、dev server preview を first-class に扱う必要がある。
+- スコープ:
+  - package.json scripts から dev / preview / build を検出する
+  - bottom panel に Preview tab を追加する
+  - demo / recorded fallback では確認用 preview と実行コマンドを表示する
+  - WebContainer 非対応環境でも、なぜ preview が fallback か分かる表示にする
+  - Local Preview を PR 前 safety workflow に接続しやすい状態にする
+- 受け入れ条件:
+  - demo repo で Preview tab が表示される
+  - dev command / preview command が表示される
+  - Preview 起動ボタンで preview log と状態が更新される
+  - 非対応環境でも recorded preview fallback として破綻しない
+  - typecheck / build / browser 確認が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Preview tab と Local Preview 起動状態を確認
+  - PR は GitHub issue #15 に `Closes #15` で紐づける
+  - PR #16 を merge 済み

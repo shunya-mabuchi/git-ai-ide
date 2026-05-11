@@ -818,6 +818,65 @@ button {
   white-space: pre-wrap;
 }
 
+.preview-panel {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  min-height: 100%;
+  padding: 10px;
+}
+
+.preview-info,
+.preview-frame,
+.preview-log {
+  background: #10161b;
+  border: 1px solid #2a2f36;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.preview-info {
+  align-content: start;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.preview-info strong,
+.preview-frame strong {
+  color: #eef3f6;
+  font-size: 13px;
+}
+
+.preview-info span,
+.preview-frame span,
+.preview-frame p {
+  color: #9aa6b2;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.preview-frame {
+  align-content: center;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 18px;
+  text-align: center;
+}
+
+.preview-log {
+  color: #d6dee6;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  white-space: pre-wrap;
+}
+
 .pr-draft-panel {
   display: grid;
   grid-template-rows: 34px minmax(0, 1fr);
