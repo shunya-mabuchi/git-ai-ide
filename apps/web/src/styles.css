@@ -849,12 +849,18 @@ button {
 }
 
 .preview-info span,
+.preview-info a,
 .preview-frame span,
 .preview-frame p {
   color: #9aa6b2;
   font-size: 12px;
   line-height: 1.45;
   margin: 0;
+}
+
+.preview-info a {
+  color: #8bd8ff;
+  overflow-wrap: anywhere;
 }
 
 .preview-frame {
@@ -864,6 +870,15 @@ button {
   justify-items: center;
   padding: 18px;
   text-align: center;
+}
+
+.preview-iframe {
+  background: #ffffff;
+  border: 1px solid #2a2f36;
+  border-radius: 6px;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
 }
 
 .preview-log {
