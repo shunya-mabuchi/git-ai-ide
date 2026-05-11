@@ -435,6 +435,36 @@ button {
   font-size: 11px;
 }
 
+.source-mode {
+  border: 1px solid #303640;
+  border-radius: 6px;
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.source-mode strong {
+  color: #eef3f6;
+  font-size: 13px;
+}
+
+.source-mode span {
+  color: #a8b3bd;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.source-mode-demo {
+  background: #191711;
+  border-color: #5a4a23;
+}
+
+.source-mode-real {
+  background: #101817;
+  border-color: #28514a;
+}
+
 .branch-input {
   display: grid;
   gap: 5px;
@@ -760,6 +790,49 @@ button {
 .github-box strong {
   color: #e6ebef;
   font-size: 12px;
+}
+
+.github-box-heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.mode-chip {
+  border: 1px solid #4a5663;
+  border-radius: 999px;
+  color: #dbe4ea;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.mode-chip.demo {
+  background: #2a2415;
+  border-color: #6a5522;
+  color: #e5c07b;
+}
+
+.mode-chip.real {
+  background: #10251f;
+  border-color: #2d6a57;
+  color: #8bd8a5;
+}
+
+.demo-warning {
+  background: #171410;
+  border: 1px solid #5a4a23;
+  border-radius: 6px;
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+}
+
+.demo-warning strong {
+  color: #f0d28a;
 }
 
 .github-box span,

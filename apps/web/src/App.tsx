@@ -364,12 +364,18 @@ export function App() {
     [baselineFiles, branchName, files],
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
+  const realGitHubMode = githubConfigured && Boolean(selectedInstallationId);
+  const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "Demo Source Control";
+  const sourceControlModeDetail = realGitHubMode
+    ? "選択した GitHub repository に branch push / PR 作成を行います。"
+    : "これはブラウザ内 snapshot と demo repository の simulation です。実 GitHub repo は変更されません。";
+  const githubOperationLabel = realGitHubMode ? "Real GitHub operation" : "Demo simulation";
   const branchSummaries = useMemo<BranchSummary[]>(
     () => [
       {
         ahead: 0,
         behind: 0,
-        label: "base branch",
+        label: realGitHubMode ? "base branch" : "demo base branch",
         name: "main",
         role: "base",
         status: branchName === "main" ? "current" : "ready",
@@ -377,7 +383,7 @@ export function App() {
       {
         ahead: commitCreated ? 1 : gitStatus.hasChanges ? 0 : branchPushed ? 1 : 0,
         behind: 0,
-        label: "working branch",
+        label: realGitHubMode ? "working branch" : "browser snapshot branch",
         name: branchName,
         role: "working",
         status: gitStatus.hasChanges ? "needs-work" : "current",
@@ -385,43 +391,43 @@ export function App() {
       {
         ahead: branchPushed ? 1 : 0,
         behind: branchPushed ? 0 : 1,
-        label: "PR branch",
-        name: `${branchName}-review`,
+        label: realGitHubMode ? "PR branch" : "demo PR branch preview",
+        name: realGitHubMode ? `${branchName}-review` : `${branchName}-demo-preview`,
         role: "review",
         status: branchPushed ? "ready" : "needs-work",
       },
     ],
-    [branchName, branchPushed, commitCreated, gitStatus.hasChanges],
+    [branchName, branchPushed, commitCreated, gitStatus.hasChanges, realGitHubMode],
   );
   const commitHistory = useMemo<CommitHistoryItem[]>(
     () => [
       ...(commitCreated
         ? [
             {
-              author: "You + Git AI IDE",
+              author: realGitHubMode ? "You + GitHub" : "You + Git AI IDE demo",
               branch: branchName,
               message: commitMessage.split("\n")[0] || "Improve PR summary generation",
               sha: pushedCommitSha.slice(0, 7) || "local01",
-              time: branchPushed ? "pushed" : "local draft",
+              time: branchPushed ? (realGitHubMode ? "pushed" : "demo pushed") : "local draft",
             },
           ]
         : []),
       {
-        author: "demo",
+        author: realGitHubMode ? "remote" : "demo fixture",
         branch: "main",
         message: "Add PR summary generator",
         sha: "b41f7a2",
-        time: "base",
+        time: realGitHubMode ? "remote base" : "demo base",
       },
       {
-        author: "demo",
+        author: realGitHubMode ? "remote" : "demo fixture",
         branch: "main",
         message: "Create typed summary contract",
         sha: "9c12d4e",
-        time: "base",
+        time: realGitHubMode ? "remote base" : "demo base",
       },
     ],
-    [branchName, branchPushed, commitCreated, commitMessage, pushedCommitSha],
+    [branchName, branchPushed, commitCreated, commitMessage, pushedCommitSha, realGitHubMode],
   );
   const mergeReadiness = useMemo<MergeReadinessItem[]>(
     () => [
@@ -1440,6 +1446,10 @@ export function App() {
               {sidePanelMode === "git" ? (
                 <section className="explorer-section">
                   <PanelTitle title="Source Control" />
+                  <div className={realGitHubMode ? "source-mode source-mode-real" : "source-mode source-mode-demo"}>
+                    <strong>{sourceControlModeLabel}</strong>
+                    <span>{sourceControlModeDetail}</span>
+                  </div>
                   <div className="git-summary">
                     <span><GitBranch size={14} /> {gitStatus.branch}</span>
                     <strong>{sourceControlSummary}</strong>
@@ -1550,14 +1560,23 @@ export function App() {
                       Commit draft
                     </button>
                     <button className="button secondary" disabled={!commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
-                      {isPushingBranch ? "Pushing" : "Push"}
+                      {isPushingBranch ? "Pushing" : realGitHubMode ? "Push" : "Demo push"}
                     </button>
                     <button className="button" disabled={!safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
-                      {isCreatingPr ? "作成中" : "PR 作成"}
+                      {isCreatingPr ? "作成中" : realGitHubMode ? "PR 作成" : "Demo PR 作成"}
                     </button>
                   </div>
                   <div className="github-box">
-                    <strong>GitHub Integration</strong>
+                    <div className="github-box-heading">
+                      <strong>GitHub Integration</strong>
+                      <span className={realGitHubMode ? "mode-chip real" : "mode-chip demo"}>{githubOperationLabel}</span>
+                    </div>
+                    {!realGitHubMode ? (
+                      <div className="demo-warning">
+                        <strong>実 GitHub repository には接続していません</strong>
+                        <span>Repository / branch / history は demo 用の表示です。GitHub App credentials と Worker が有効になると selected repo への実操作に切り替わります。</span>
+                      </div>
+                    ) : null}
                     {githubConfigured ? (
                       <label className="repo-select">
                         <span>Installation</span>
@@ -1577,9 +1596,9 @@ export function App() {
                       </label>
                     ) : null}
                     <label className="repo-select">
-                      <span>Repository</span>
+                      <span>{realGitHubMode ? "Selected repository" : "Demo repository"}</span>
                       <select
-                        disabled={githubRepositories.length === 0 || isLoadingGitHubRepositories}
+                        disabled={!realGitHubMode || githubRepositories.length === 0 || isLoadingGitHubRepositories}
                         value={selectedRepository}
                         onChange={(event) => {
                           const repository = githubRepositories.find((item) => item.fullName === event.target.value);
@@ -1594,11 +1613,11 @@ export function App() {
                         ))}
                       </select>
                     </label>
-                    <span>{githubConfigured ? "GitHub App configured" : "Demo mode"}</span>
+                    <span>{realGitHubMode ? "GitHub App configured / selected repo mode" : "Demo mode / no GitHub write operation"}</span>
                     {isLoadingGitHubRepositories ? <span>Repository を読み込み中</span> : null}
                     <span>{githubStatusMessage}</span>
                     {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : null}
-                    <span>{branchPushed ? "branch pushed" : "push pending"}</span>
+                    <span>{branchPushed ? (realGitHubMode ? "branch pushed" : "demo branch push simulated") : realGitHubMode ? "push pending" : "demo push pending"}</span>
                     {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}
                     <ul className="github-readiness">

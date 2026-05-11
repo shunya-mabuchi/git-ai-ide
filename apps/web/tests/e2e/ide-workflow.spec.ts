@@ -16,9 +16,11 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-note.md" })).toBeVisible();
 
     await page.getByLabel("Git").click();
+    await expect(page.getByText("Demo Source Control")).toBeVisible();
+    await expect(page.getByText("実 GitHub repository には接続していません")).toBeVisible();
     await expect(page.getByText("Branches")).toBeVisible();
     await expect(page.getByText("Merge readiness")).toBeVisible();
-    await expect(page.getByText("History")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByRole("button", { name: /e2e-note\.md added/ })).toBeVisible();
 
     await page.getByRole("button", { name: "競合デモ" }).click();
