@@ -98,10 +98,12 @@ export type ContextPack = {
 };
 
 export type SafetyGateInput = {
+  branchPushed: boolean;
   branchGoalSet: boolean;
   contextPackReviewed: boolean;
   modelAccepted: boolean;
   patchReviewed: boolean;
+  previewChecked: boolean;
   testsPassed: boolean;
   commitCreated: boolean;
   prDraftGenerated: boolean;
@@ -169,6 +171,11 @@ export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
       status: input.testsPassed ? "pass" : "warning",
     },
     {
+      id: "preview",
+      label: "Local Preview checked",
+      status: input.previewChecked ? "pass" : "warning",
+    },
+    {
       id: "warnings",
       label: "Unresolved warnings",
       status: input.unresolvedWarnings === 0 ? "pass" : "warning",
@@ -183,6 +190,11 @@ export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
       label: "PR draft",
       status: input.prDraftGenerated ? "pass" : "warning",
     },
+    {
+      id: "branch-pushed",
+      label: "Branch pushed",
+      status: input.branchPushed ? "pass" : "warning",
+    },
   ];
 
   const blocked = items.some((item) => item.status === "blocked");
@@ -190,7 +202,9 @@ export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
   const canCreatePullRequest =
     canCreateCommit &&
     input.testsPassed &&
+    input.previewChecked &&
     input.commitCreated &&
+    input.branchPushed &&
     input.prDraftGenerated &&
     input.unresolvedWarnings === 0;
 
