@@ -614,6 +614,26 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で Assisted Memory controls と project key 表示を確認
   - PR #43 を作成済み
 
+## GAI-029: Demo mode と実 GitHub 操作の境界を明確にする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/46
+- 背景: Source Control に demo branch / demo history / demo repository が実 GitHub repo のように表示され、ユーザーが実 repo 操作と誤解しやすい。
+- スコープ:
+  - Source Control の見出しを GitHub 接続状態に応じて Demo / GitHub に分ける
+  - demo branch / demo history / demo repository を明確に demo と表示する
+  - GitHub 未接続時は Push / PR 作成が demo simulation であることを説明に出す
+- 受け入れ条件:
+  - demo mode のとき実 repo を操作しているように見えない
+  - GitHub App configured のときだけ real operation と分かる
+  - typecheck / build / E2E が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+
 ## GAI-027: Playwright E2E suite を追加する
 
 - 状態: 完了
