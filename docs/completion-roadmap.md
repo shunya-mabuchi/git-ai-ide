@@ -53,6 +53,8 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
   - Patch Queue の未確認項目を PR 作成前 gate に接続する
   - Local Preview / Tests / Diff Review を safety checklist に反映する
   - branch goal と assisted memory の未設定を warning として扱う
+  - 完了: Local Preview と Branch pushed を Safety Gate 本体へ統合
+  - 残り: Assisted Memory 未設定 warning と実 E2E 結果の反映
 
 ### 6. ポートフォリオ用の仕上げ
 

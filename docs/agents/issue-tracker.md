@@ -418,3 +418,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で async patch proposal flow を確認
   - PR は GitHub issue #25 に `Closes #25` で紐づける
   - PR #26 を merge 済み
+
+## GAI-019: Workflow Safety Gate に Preview と Push を統合する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/27
+- 背景: PR 作成前チェックはあるが、Local Preview と branch push が Safety Gate 本体に統合されていない。AI workflow safety を面接で説明しやすくするため、Diff Review / Tests / Local Preview / Commit / Push / PR draft を同じ gate で扱う必要がある。
+- スコープ:
+  - SafetyGateInput に previewChecked / branchPushed を追加する
+  - evaluateSafetyGate に Local Preview と Branch pushed を追加する
+  - PR 作成可否を preview / push まで含めて判定する
+  - App 側の safetyGate 入力と UI を更新する
+  - shared package に safety gate test を追加する
+- 受け入れ条件:
+  - preview 未確認の場合 PR 作成不可になる
+  - branch 未 push の場合 PR 作成不可になる
+  - PR 作成前チェックに Local Preview と Branch pushed が表示される
+  - shared test / typecheck / web build が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/shared test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で PR 作成前チェックに Local Preview checked / Branch pushed が表示されることを確認
+  - PR は GitHub issue #27 に `Closes #27` で紐づける
+  - PR #28 を merge 済み

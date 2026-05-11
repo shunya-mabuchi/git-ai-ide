@@ -328,16 +328,18 @@ export function App() {
   const safetyGate = useMemo(
     () =>
       evaluateSafetyGate({
+        branchPushed,
         branchGoalSet: Boolean(branchGoalMarkdown.trim()),
         commitCreated,
         contextPackReviewed: true,
         modelAccepted: selectedRuntimeAvailable,
         patchReviewed: patchApplied || commitCreated,
+        previewChecked: previewRunState === "ready",
         prDraftGenerated,
         testsPassed: testsRun,
         unresolvedWarnings: runtimePlan.warnings.length,
       }),
-    [branchGoalMarkdown, commitCreated, patchApplied, prDraftGenerated, runtimePlan.warnings.length, selectedRuntimeAvailable, testsRun],
+    [branchGoalMarkdown, branchPushed, commitCreated, patchApplied, previewRunState, prDraftGenerated, runtimePlan.warnings.length, selectedRuntimeAvailable, testsRun],
   );
   const currentStep = commitCreated ? "Commit draft 作成済み" : testsRun ? "PR 作成待ち" : patchApplied ? "Tests 実行待ち" : "変更中";
   const safetyStatus = testsRun
@@ -1352,7 +1354,6 @@ export function App() {
                       {item.label}
                     </span>
                   ))}
-                  <span>{branchPushed ? <CheckCircle2 size={15} /> : <Circle size={15} />} Branch pushed</span>
                   <span>{createdPrUrl ? <CheckCircle2 size={15} /> : <Circle size={15} />} PR created</span>
                 </div>
               </section>
