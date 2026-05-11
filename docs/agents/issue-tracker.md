@@ -169,7 +169,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-009: GitHub App installation と repo 選択 flow を整える
 
-- 状態: レビュー中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/7
@@ -188,3 +188,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - demo mode browser 確認成功
   - PR は GitHub issue #7 に `Closes #7` で紐づける
+  - PR #8 を merge 済み
+
+## GAI-010: Explorer をフォルダ階層表示にする
+
+- 状態: レビュー中
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/9
+- 背景: Explorer が file path を平らに並べており、実際の IDE のように folder hierarchy を把握できない。Git project を開く体験として、フォルダの開閉と階層表示が必要。
+- スコープ:
+  - file path から Explorer tree を構築する
+  - folder / file を階層表示する
+  - folder を開閉できるようにする
+  - 選択中 file を tree 上で active 表示する
+  - demo repo / local directory snapshot の両方で動作する
+- 受け入れ条件:
+  - `src/features/...` が folder 階層として表示される
+  - folder をクリックすると開閉できる
+  - file をクリックすると editor に表示される
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Explorer tree 表示確認済み
+  - PR は GitHub issue #9 に `Closes #9` で紐づける
