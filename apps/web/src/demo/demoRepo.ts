@@ -17,6 +17,17 @@ export const demoFiles = {
   }
 }
 `,
+  "tsconfig.json": `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
+`,
   "src/features/pr-summary/generateSummary.ts": `export type ChangedFileArea = "ui" | "api" | "tests" | "config" | "docs" | "unknown";
 
 export function generateSummary(diff: string) {
@@ -58,7 +69,7 @@ Git diff から PR タイトル、説明、リスク、テスト観点を生成�
 export const demoRepoMap: RepoMap = {
   name: "pr-helper-mini",
   detectedStack: ["TypeScript", "Vite", "Vitest"],
-  importantFiles: ["package.json", "src/features/pr-summary/generateSummary.ts"],
+  importantFiles: ["package.json", "tsconfig.json", "src/features/pr-summary/generateSummary.ts"],
   commands: {
     test: "npm run test",
     typecheck: "npm run typecheck",

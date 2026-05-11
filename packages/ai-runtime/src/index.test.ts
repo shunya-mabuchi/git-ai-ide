@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectBrowserAiRuntime } from "./index";
+import { detectBrowserAiRuntime, planRuntimeFromPackageJson } from "./index";
 
 describe("detectBrowserAiRuntime", () => {
   it("uses recorded mode when WebGPU and Ollama are unavailable", async () => {
@@ -51,5 +51,40 @@ describe("detectBrowserAiRuntime", () => {
     expect(status.ollamaAvailable).toBe(true);
     expect(status.providers.find((provider) => provider.provider === "ollama")?.modelIds).toEqual(["qwen2.5-coder:7b"]);
     expect(status.models.some((model) => model.modelId === "qwen2.5-coder:7b")).toBe(true);
+  });
+});
+
+describe("planRuntimeFromPackageJson", () => {
+  it("uses npm commands when no lockfile is present", () => {
+    expect(
+      planRuntimeFromPackageJson({
+        "package.json": JSON.stringify({
+          scripts: {
+            test: "vitest run",
+            typecheck: "tsc --noEmit",
+          },
+        }),
+      }),
+    ).toMatchObject({
+      installCommand: "npm install",
+      testCommand: "npm run test",
+      typecheckCommand: "npm run typecheck",
+    });
+  });
+
+  it("uses pnpm commands when pnpm-lock.yaml is present", () => {
+    expect(
+      planRuntimeFromPackageJson({
+        "package.json": JSON.stringify({
+          scripts: {
+            test: "vitest run",
+          },
+        }),
+        "pnpm-lock.yaml": "lockfileVersion: 9.0",
+      }),
+    ).toMatchObject({
+      installCommand: "pnpm install",
+      testCommand: "pnpm run test",
+    });
   });
 });

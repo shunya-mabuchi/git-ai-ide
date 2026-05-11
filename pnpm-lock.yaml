@@ -32,6 +32,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.4
         version: 4.7.0(vite@6.4.2)
+      '@webcontainer/api':
+        specifier: ^1.6.4
+        version: 1.6.4
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.6)
@@ -1050,6 +1053,9 @@ packages:
 
   '@vitest/utils@2.1.9':
     resolution: {integrity: sha512-v0psaMSkNJ3A2NMrUEHFRzJtDPFn+/VWZ5WxImB21T9fjucJRmS7xCS3ppEnARb9y11OAzaD+P2Ps+b+BGX5iQ==}
+
+  '@webcontainer/api@1.6.4':
+    resolution: {integrity: sha512-r9sHCXg1FcC1AMgppGwAc0vYWaQhqvg282cnsuPbJEzYnWifAdCVvg+8ngJUEHyHcomhJJp+/zuytite4ITHLw==}
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -2451,6 +2457,8 @@ snapshots:
       '@vitest/pretty-format': 2.1.9
       loupe: 3.2.1
       tinyrainbow: 1.2.0
+
+  '@webcontainer/api@1.6.4': {}
 
   abort-controller@3.0.0:
     dependencies:
