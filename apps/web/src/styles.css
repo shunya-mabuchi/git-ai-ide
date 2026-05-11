@@ -1487,6 +1487,26 @@ button {
   min-height: 88px;
 }
 
+.memory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.memory-meta {
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.memory-meta span {
+  color: #8f9aa6;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .check-list {
   list-style: none;
   margin: 0;

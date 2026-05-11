@@ -591,3 +591,25 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - browser で Explorer file create と Source Control の branch/history/merge readiness を確認
   - PR #42 を作成済み
+
+## GAI-026: PR description と Assisted Memory を強化する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種類:機能`, `領域:ai-runtime`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/39
+- 背景: PR description が固定文のままだと、AI workflow のありがたみが弱い。branch goal、diff、検証結果、project-specific memory を使って、レビュー可能な PR 本文を構造化して生成する必要がある。
+- スコープ:
+  - PR description を branch goal / git diff / safety / memory から動的生成する
+  - Assisted Memory を project-specific に保存、復元、削除できるようにする
+  - PR 作成時に生成済み markdown を body として使う
+  - 変更後に typecheck / build / browser smoke を実行する
+- 受け入れ条件:
+  - PR draft に概要、変更内容、受け入れ条件、Assisted Memory、リスク、テストが含まれる
+  - Assisted Memory が repository/workspace key ごとに保存・復元できる
+  - typecheck / build / browser smoke が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Assisted Memory controls と project key 表示を確認
+  - PR #43 を作成済み
