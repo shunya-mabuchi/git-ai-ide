@@ -614,6 +614,58 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で Assisted Memory controls と project key 表示を確認
   - PR #43 を作成済み
 
+## GAI-031: Local Preview を editor tab として開けるようにする
+
+- 状態: 未着手
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: 未定
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/50
+- 背景: 現在の Local Preview は独立したパネルとして扱われており、IDE としてはファイル表示領域との関係が弱い。一般的な IDE / editor では preview は editor area の tab として開き、選択ファイルと同じ場所で切り替えられる。
+- スコープ:
+  - editor tab model に preview tab を追加する
+  - Preview tab をファイル tab と同じ tab strip に表示する
+  - Preview tab 選択時は中央 editor area に preview content を表示する
+  - 既存の Local Preview panel は補助情報、preflight、runtime status に役割を絞るか、tab 内へ統合する
+  - demo / WebContainer / best-effort fallback の状態を preview tab 内で分かるようにする
+  - preview tab を閉じてもファイル tab の状態が壊れないようにする
+- 受け入れ条件:
+  - ユーザーが Preview を開くと中央 editor area に Preview tab が作られる
+  - Preview tab と通常ファイル tab をクリックで切り替えられる
+  - Preview tab には dev server / WebContainer / fallback の状態が表示される
+  - Source Control や AI Assistant の横幅変更と干渉しない
+  - mobile / desktop で tab text や preview content が崩れない
+- 検証:
+  - Playwright E2E で Preview tab を開き、ファイル tab に戻れることを確認する
+  - `pnpm -r typecheck`
+  - `pnpm --filter @git-ai-ide/web build`
+  - `pnpm --filter @git-ai-ide/web test:e2e`
+
+## GAI-030: GitHub 実操作モードへの接続導線を明確にする
+
+- 状態: 未着手
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `領域:web`, `優先度:p1`
+- 担当: 未定
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/49
+- 背景: 現在の Source Control / GitHub Integration は demo fallback であることは表示しているが、実 GitHub repository を操作するために何を設定すればよいかが画面内で分かりにくい。ユーザーは GitHub 認証済み repo から branch を切り、push / PR 作成する体験を期待している。
+- スコープ:
+  - Worker 未起動、GitHub App secrets 未設定、installation 未選択、repository 未選択を別々の状態として表示する
+  - GitHub Integration に Connect GitHub App 導線と setup checklist を追加する
+  - demo Source Control と real GitHub Source Control の表示を明確に分ける
+  - real mode では demo history / demo branch を混ぜず、選択 repo / installation / branch / push / PR 状態を中心に表示する
+  - setup docs へのリンクを UI から辿れるようにする
+- 受け入れ条件:
+  - demo mode のとき、実 repo を操作していないことと、実操作に必要な未完了条件が分かる
+  - Worker が起動しているが secret 未設定の状態を区別できる
+  - GitHub App configured だが installation がない状態を区別できる
+  - installation と selected repo が揃ったときだけ real operation として表示される
+  - Source Control の branch / history 表示が demo と real で混ざらない
+- 検証:
+  - unit test または shared logic test で readiness state を確認する
+  - Playwright E2E で demo fallback 表示と setup checklist を確認する
+  - `pnpm -r typecheck`
+  - `pnpm --filter @git-ai-ide/web build`
+  - `pnpm --filter @git-ai-ide/web test:e2e`
+
 ## GAI-029: Demo mode と実 GitHub 操作の境界を明確にする
 
 - 状態: 完了
