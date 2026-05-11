@@ -6,23 +6,25 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
 
 ### 1. Local Preview
 
-- 状態: 実装中
+- 状態: 一部完了
 - 目的: 変更後のアプリを IDE 内で確認できるようにする
 - 必要なこと:
   - `package.json` から `dev` / `preview` / `build` script を検出する
   - Preview tab を bottom panel に追加する
   - WebContainer 対応 repo では dev server を起動する
   - 非対応 repo では確認コマンドと fallback 理由を表示する
+  - 残り: 実 repo で WebContainer iframe 表示を E2E 確認する
 
 ### 2. AI Patch Proposal の実体化
 
-- 状態: 未完了
+- 状態: 一部完了
 - 目的: recorded demo ではなく、選択ファイルと branch goal を使って patch proposal を生成する
 - 必要なこと:
   - Context Pack を structured input として組み立てる
   - Recorded AI / WebLLM / Ollama の provider 境界をそろえる
   - LLM 出力を structured edit schema で検証する
   - patch queue に追加し、diff review 後だけ適用できるようにする
+  - 残り: WebLLM / Ollama の実レスポンスを schema validation に通す
 
 ### 3. Search / Editor の実用補強
 

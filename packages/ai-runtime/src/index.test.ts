@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectBrowserAiRuntime, planRuntimeFromPackageJson } from "./index";
+import { detectBrowserAiRuntime, generatePatchProposal, planRuntimeFromPackageJson } from "./index";
 
 describe("detectBrowserAiRuntime", () => {
   it("uses recorded mode when WebGPU and Ollama are unavailable", async () => {
@@ -91,6 +91,54 @@ describe("planRuntimeFromPackageJson", () => {
     ).toMatchObject({
       installCommand: "pnpm install",
       testCommand: "pnpm run test",
+    });
+  });
+});
+
+describe("generatePatchProposal", () => {
+  it("creates a structured edit for the PR summary demo file", () => {
+    const result = generatePatchProposal({
+      branchGoalMarkdown: "# Branch Goal\n\nPR summary を改善する",
+      currentFile: {
+        content: `export function generateSummary(diff: string) {
+  const changedFiles = extractChangedFiles(diff);
+
+  return { changedFiles };
+}
+`,
+        path: "src/features/pr-summary/generateSummary.ts",
+      },
+      mode: "recorded",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      proposal: {
+        edits: [
+          {
+            file: "src/features/pr-summary/generateSummary.ts",
+            operation: "replace",
+          },
+        ],
+        status: "ready",
+        title: "空の diff 入力を扱う",
+      },
+    });
+  });
+
+  it("returns a safe failure when the current file is empty", () => {
+    expect(
+      generatePatchProposal({
+        branchGoalMarkdown: "# Branch Goal",
+        currentFile: {
+          content: "",
+          path: "README.md",
+        },
+        mode: "recorded",
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: "現在のファイルが空のため、structured edit を生成できません。",
     });
   });
 });

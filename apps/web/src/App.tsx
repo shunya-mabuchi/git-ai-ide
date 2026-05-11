@@ -19,10 +19,10 @@ import {
 import type { PointerEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Editor, { DiffEditor } from "@monaco-editor/react";
-import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
+import { createDefaultRuntimeStatus, detectBrowserAiRuntime, generatePatchProposal, planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
-import { evaluateSafetyGate } from "@git-ai-ide/shared";
+import { evaluateSafetyGate, type PatchProposal } from "@git-ai-ide/shared";
 import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
@@ -95,6 +95,9 @@ export function App() {
   const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
   const [workspaceRestored, setWorkspaceRestored] = useState(false);
   const [patchApplied, setPatchApplied] = useState(false);
+  const [activePatch, setActivePatch] = useState<PatchProposal>(demoPatch);
+  const [patchGenerationState, setPatchGenerationState] = useState<"idle" | "running">("idle");
+  const [patchGenerationMessage, setPatchGenerationMessage] = useState("Recorded AI demo patch を読み込み済みです。");
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffMode, setDiffMode] = useState<DiffMode>("patch");
   const [diffFile, setDiffFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
@@ -281,8 +284,8 @@ export function App() {
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
   const currentFile = files[selectedFile] ?? "";
-  const preview = useMemo(() => applyStructuredEdits(files, demoPatch.edits), [files]);
-  const primaryEdit = demoPatch.edits[0];
+  const preview = useMemo(() => applyStructuredEdits(files, activePatch.edits), [activePatch.edits, files]);
+  const primaryEdit = activePatch.edits[0] ?? demoPatch.edits[0];
   const patchTargetAvailable = Boolean(files[primaryEdit.file]);
   const previewFile = preview.ok ? preview.files[primaryEdit.file] : undefined;
   const activeDiffFile = diffMode === "patch" ? primaryEdit.file : diffFile;
@@ -352,6 +355,41 @@ export function App() {
     setDiffFile(primaryEdit.file);
     setDiffMode("patch");
     setDiffOpen(true);
+  };
+
+  const generateAiPatchProposal = () => {
+    setPatchGenerationState("running");
+    const result = generatePatchProposal({
+      branchGoalMarkdown,
+      currentFile: {
+        content: currentFile,
+        path: selectedFile,
+      },
+      mode: aiRuntimeMode,
+    });
+
+    if (!result.ok) {
+      setPatchGenerationMessage(`${result.error}${result.warnings.length ? ` ${result.warnings.join(" / ")}` : ""}`);
+      setPatchGenerationState("idle");
+      return;
+    }
+
+    setActivePatch(result.proposal);
+    setPatchApplied(false);
+    setTestsRun(false);
+    setRuntimeLog(demoTestLogIdle);
+    setPrDraftGenerated(false);
+    setCommitCreated(false);
+    setBranchPushed(false);
+    setPushedCommitSha("");
+    setCreatedPrUrl("");
+    setDiffMode("patch");
+    setDiffFile(result.proposal.edits[0]?.file ?? selectedFile);
+    setDiffOpen(false);
+    setPatchGenerationMessage(
+      `${runtimeLabels[result.mode]} で patch proposal を生成しました。${result.warnings.length ? ` ${result.warnings.join(" / ")}` : ""}`,
+    );
+    setPatchGenerationState("idle");
   };
 
   const openChangedFileDiff = (file: string) => {
@@ -517,6 +555,8 @@ export function App() {
       setDiffFile(preferredFile);
       setDiffOpen(false);
       setPatchApplied(false);
+      setActivePatch(demoPatch);
+      setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
       setTestsRun(false);
       setRuntimeLog(demoTestLogIdle);
       setPreviewRunState("idle");
@@ -547,6 +587,8 @@ export function App() {
     setDiffFile("src/features/pr-summary/generateSummary.ts");
     setDiffOpen(false);
     setPatchApplied(false);
+    setActivePatch(demoPatch);
+    setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
     setTestsRun(false);
     setRuntimeLog(demoTestLogIdle);
     setPreviewRunState("idle");
@@ -1255,10 +1297,11 @@ export function App() {
                 <PanelTitle title="Patch Queue" />
                 <article className="patch-card">
                   <div className="patch-heading">
-                    <strong>{demoPatch.title}</strong>
+                    <strong>{activePatch.title}</strong>
                     <span>{patchApplied ? "適用済み" : preview.ok ? "レビュー可能" : "確認が必要"}</span>
                   </div>
-                  <p>{demoPatch.summary}</p>
+                  <p>{activePatch.summary}</p>
+                  <p>{patchGenerationMessage}</p>
                   <ul className="check-list">
                     <li><CheckCircle2 size={15} /> 構造化 edit を解析済み</li>
                     <li>{patchTargetAvailable ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} 対象ファイル</li>
@@ -1267,6 +1310,9 @@ export function App() {
                     <li>{testsRun ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} {testsRun ? "テスト通過" : "テスト未実行"}</li>
                   </ul>
                   <div className="patch-actions">
+                    <button className="button secondary" disabled={patchGenerationState === "running"} onClick={generateAiPatchProposal}>
+                      {patchGenerationState === "running" ? "生成中" : "AI patch を生成"}
+                    </button>
                     <button className="button secondary" disabled={!patchTargetAvailable} onClick={openDiffPreview}>Diff を確認</button>
                     <button className="button" disabled={!patchTargetAvailable || !preview.ok || patchApplied} onClick={applyPatch}>
                       適用
