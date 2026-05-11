@@ -616,7 +616,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-031: Local Preview を editor tab として開けるようにする
 
-- 状態: 未着手
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
 - 担当: 未定
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/50
@@ -635,10 +635,10 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - Source Control や AI Assistant の横幅変更と干渉しない
   - mobile / desktop で tab text や preview content が崩れない
 - 検証:
-  - Playwright E2E で Preview tab を開き、ファイル tab に戻れることを確認する
-  - `pnpm -r typecheck`
-  - `pnpm --filter @git-ai-ide/web build`
-  - `pnpm --filter @git-ai-ide/web test:e2e`
+  - Playwright E2E で Preview tab を開き、ファイル tab に戻れることを確認
+  - `pnpm --filter @git-ai-ide/web test` 相当成功
+  - `pnpm --filter @git-ai-ide/web build` 相当成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 相当成功
 
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 

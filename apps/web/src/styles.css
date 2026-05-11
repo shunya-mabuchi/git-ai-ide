@@ -1019,6 +1019,7 @@ button {
 
 .editor-surface,
 .editor-card,
+.editor-preview-card,
 .diff-panel {
   height: 100%;
   min-height: 0;
@@ -1032,6 +1033,7 @@ button {
 }
 
 .editor-card,
+.editor-preview-card,
 .diff-panel {
   display: grid;
 }
@@ -1039,6 +1041,11 @@ button {
 .editor-card {
   background: #1e1e1e;
   grid-template-rows: minmax(0, 1fr);
+}
+
+.editor-preview-card {
+  background: #10161b;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .editor-toolbar {
