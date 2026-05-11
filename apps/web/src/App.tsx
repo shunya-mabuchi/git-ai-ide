@@ -5,15 +5,20 @@ import {
   Circle,
   Code2,
   File,
+  FilePlus2,
   Files,
   Folder,
   FolderOpen,
   GitBranch,
   GitPullRequest,
+  History,
+  Merge,
+  Pencil,
   Play,
   Search,
   ShieldCheck,
   TriangleAlert,
+  Trash2,
   X,
 } from "lucide-react";
 import type { PointerEvent } from "react";
@@ -67,6 +72,30 @@ type ExplorerNode = {
 type RuntimeDiagnosticItem = {
   detail: string;
   group: "github" | "webllm" | "ollama" | "webcontainer";
+  id: string;
+  label: string;
+  status: "pass" | "warning" | "blocked";
+};
+
+type BranchSummary = {
+  ahead: number;
+  behind: number;
+  label: string;
+  name: string;
+  role: "base" | "working" | "review";
+  status: "current" | "ready" | "needs-work";
+};
+
+type CommitHistoryItem = {
+  author: string;
+  branch: string;
+  message: string;
+  sha: string;
+  time: string;
+};
+
+type MergeReadinessItem = {
+  detail: string;
   id: string;
   label: string;
   status: "pass" | "warning" | "blocked";
@@ -131,6 +160,11 @@ export function App() {
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [branchName, setBranchName] = useState("feature/pr-summary");
   const [branchGoalMarkdown, setBranchGoalMarkdown] = useState(demoBranchGoal.markdown);
+  const [newFilePath, setNewFilePath] = useState("src/features/pr-summary/notes.md");
+  const [renameFilePath, setRenameFilePath] = useState("src/features/pr-summary/generateSummary.ts");
+  const [mergeTargetBranch, setMergeTargetBranch] = useState("main");
+  const [conflictDemoEnabled, setConflictDemoEnabled] = useState(false);
+  const [fileOperationMessage, setFileOperationMessage] = useState("選択中のファイルに対して作成・改名・削除できます。");
   const [commitMessage, setCommitMessage] = useState("");
   const [commitCreated, setCommitCreated] = useState(false);
   const [branchPushed, setBranchPushed] = useState(false);
@@ -287,6 +321,10 @@ export function App() {
     revealEditorLine(editorRef.current, editorTarget.line);
   }, [diffOpen, editorTarget, selectedFile]);
 
+  useEffect(() => {
+    setRenameFilePath(selectedFile);
+  }, [selectedFile]);
+
   const fileNames = useMemo(() => Object.keys(files).sort(), [files]);
   const explorerTree = useMemo(() => buildExplorerTree(fileNames), [fileNames]);
   const searchResults = useMemo(() => searchWorkspace(files, searchQuery), [files, searchQuery]);
@@ -300,6 +338,102 @@ export function App() {
     [baselineFiles, branchName, files],
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
+  const branchSummaries = useMemo<BranchSummary[]>(
+    () => [
+      {
+        ahead: 0,
+        behind: 0,
+        label: "base branch",
+        name: "main",
+        role: "base",
+        status: branchName === "main" ? "current" : "ready",
+      },
+      {
+        ahead: commitCreated ? 1 : gitStatus.hasChanges ? 0 : branchPushed ? 1 : 0,
+        behind: 0,
+        label: "working branch",
+        name: branchName,
+        role: "working",
+        status: gitStatus.hasChanges ? "needs-work" : "current",
+      },
+      {
+        ahead: branchPushed ? 1 : 0,
+        behind: branchPushed ? 0 : 1,
+        label: "PR branch",
+        name: `${branchName}-review`,
+        role: "review",
+        status: branchPushed ? "ready" : "needs-work",
+      },
+    ],
+    [branchName, branchPushed, commitCreated, gitStatus.hasChanges],
+  );
+  const commitHistory = useMemo<CommitHistoryItem[]>(
+    () => [
+      ...(commitCreated
+        ? [
+            {
+              author: "You + Git AI IDE",
+              branch: branchName,
+              message: commitMessage.split("\n")[0] || "Improve PR summary generation",
+              sha: pushedCommitSha.slice(0, 7) || "local01",
+              time: branchPushed ? "pushed" : "local draft",
+            },
+          ]
+        : []),
+      {
+        author: "demo",
+        branch: "main",
+        message: "Add PR summary generator",
+        sha: "b41f7a2",
+        time: "base",
+      },
+      {
+        author: "demo",
+        branch: "main",
+        message: "Create typed summary contract",
+        sha: "9c12d4e",
+        time: "base",
+      },
+    ],
+    [branchName, branchPushed, commitCreated, commitMessage, pushedCommitSha],
+  );
+  const mergeReadiness = useMemo<MergeReadinessItem[]>(
+    () => [
+      {
+        detail: gitStatus.hasChanges ? `${gitStatus.entries.length} 件の未 commit 変更があります。` : "working tree は clean です。",
+        id: "clean-tree",
+        label: "Working tree",
+        status: gitStatus.hasChanges ? "warning" : "pass",
+      },
+      {
+        detail: testsRun ? "テスト実行済みです。" : "merge 前に Tests を実行してください。",
+        id: "tests",
+        label: "Tests",
+        status: testsRun ? "pass" : "blocked",
+      },
+      {
+        detail: previewRunState === "ready" ? "Local Preview 確認済みです。" : "UI 変更は preview 確認が必要です。",
+        id: "preview",
+        label: "Preview",
+        status: previewRunState === "ready" ? "pass" : "warning",
+      },
+      {
+        detail: conflictDemoEnabled
+          ? "demo/main と同じ行を変更した想定です。解消方針を確認してください。"
+          : "既知の conflict はありません。",
+        id: "conflict",
+        label: "Conflict",
+        status: conflictDemoEnabled ? "blocked" : "pass",
+      },
+      {
+        detail: branchPushed ? `${mergeTargetBranch} へ PR 作成可能です。` : "remote branch push 後に PR / merge へ進めます。",
+        id: "remote",
+        label: "Remote branch",
+        status: branchPushed ? "pass" : "warning",
+      },
+    ],
+    [branchPushed, conflictDemoEnabled, gitStatus.entries.length, gitStatus.hasChanges, mergeTargetBranch, previewRunState, testsRun],
+  );
   const currentFile = files[selectedFile] ?? "";
   const preview = useMemo(() => applyStructuredEdits(files, activePatch.edits), [activePatch.edits, files]);
   const primaryEdit = activePatch.edits[0] ?? demoPatch.edits[0];
@@ -627,6 +761,114 @@ export function App() {
 
       return nextFiles;
     });
+  };
+
+  const resetWorkflowAfterFileOperation = () => {
+    setTestsRun(false);
+    setRuntimeLog(demoTestLogIdle);
+    setPreviewRunState("idle");
+    setPreviewUrl("");
+    setPrDraftGenerated(false);
+    setCommitCreated(false);
+    setBranchPushed(false);
+    setPushedCommitSha("");
+    setCreatedPrUrl("");
+    setPatchApplied(false);
+  };
+
+  const createWorkspaceFile = () => {
+    const nextPath = normalizeWorkspacePath(newFilePath);
+
+    if (!nextPath) {
+      setFileOperationMessage("作成するファイルパスを入力してください。");
+      return;
+    }
+
+    if (files[nextPath] !== undefined) {
+      setFileOperationMessage(`${nextPath} はすでに存在します。`);
+      return;
+    }
+
+    const content = createInitialFileContent(nextPath);
+    setFiles((currentFiles) => ({
+      ...currentFiles,
+      [nextPath]: content,
+    }));
+    openFile(nextPath);
+    setDiffFile(nextPath);
+    setNewFilePath(suggestSiblingFilePath(nextPath));
+    setFileOperationMessage(`${nextPath} を作成しました。`);
+    resetWorkflowAfterFileOperation();
+  };
+
+  const renameWorkspaceFile = () => {
+    const nextPath = normalizeWorkspacePath(renameFilePath);
+
+    if (!selectedFile || files[selectedFile] === undefined) {
+      setFileOperationMessage("改名するファイルを Explorer で選択してください。");
+      return;
+    }
+
+    if (!nextPath) {
+      setFileOperationMessage("新しいファイルパスを入力してください。");
+      return;
+    }
+
+    if (nextPath === selectedFile) {
+      setFileOperationMessage("現在と同じファイルパスです。");
+      return;
+    }
+
+    if (files[nextPath] !== undefined) {
+      setFileOperationMessage(`${nextPath} はすでに存在します。`);
+      return;
+    }
+
+    setFiles((currentFiles) => {
+      const { [selectedFile]: currentContent, ...rest } = currentFiles;
+      return {
+        ...rest,
+        [nextPath]: currentContent ?? "",
+      };
+    });
+    setOpenFiles((currentFiles) => currentFiles.map((file) => (file === selectedFile ? nextPath : file)));
+    setSelectedFile(nextPath);
+    setDiffFile(nextPath);
+    setFileOperationMessage(`${selectedFile} を ${nextPath} に改名しました。`);
+    resetWorkflowAfterFileOperation();
+  };
+
+  const deleteWorkspaceFile = () => {
+    if (!selectedFile || files[selectedFile] === undefined) {
+      setFileOperationMessage("削除するファイルを Explorer で選択してください。");
+      return;
+    }
+
+    if (Object.keys(files).length <= 1) {
+      setFileOperationMessage("最後の 1 ファイルは削除できません。");
+      return;
+    }
+
+    const deletedFile = selectedFile;
+    const nextFiles = Object.keys(files)
+      .filter((file) => file !== deletedFile)
+      .sort();
+    const fallbackFile = nextFiles[0] ?? "";
+
+    setFiles((currentFiles) => {
+      const { [deletedFile]: _deletedContent, ...rest } = currentFiles;
+      return rest;
+    });
+    setOpenFiles((currentFiles) => {
+      const remainingOpenFiles = currentFiles.filter((file) => file !== deletedFile);
+      return remainingOpenFiles.length > 0 ? remainingOpenFiles : [fallbackFile];
+    });
+    setSelectedFile(fallbackFile);
+    setDiffFile(deletedFile);
+    setDiffMode("file");
+    setDiffOpen(true);
+    setFileOperationMessage(`${deletedFile} を削除しました。`);
+    resetWorkflowAfterFileOperation();
   };
 
   const toggleSidePanel = (mode: SidePanelMode) => {
@@ -1009,6 +1251,31 @@ export function App() {
                       </button>
                       <button className="button ghost" onClick={restoreDemoWorkspace}>デモ repo</button>
                     </div>
+                    <div className="file-operation-panel">
+                      <label>
+                        <span>New file</span>
+                        <input value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} />
+                      </label>
+                      <button className="icon-action" title="ファイルを作成" onClick={createWorkspaceFile}>
+                        <FilePlus2 size={15} />
+                        <span>作成</span>
+                      </button>
+                      <label>
+                        <span>Rename selected</span>
+                        <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
+                      </label>
+                      <div className="file-operation-actions">
+                        <button className="icon-action" title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
+                          <Pencil size={15} />
+                          <span>改名</span>
+                        </button>
+                        <button className="icon-action danger" title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
+                          <Trash2 size={15} />
+                          <span>削除</span>
+                        </button>
+                      </div>
+                      <small>{fileOperationMessage}</small>
+                    </div>
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
                     <nav className="file-list">
                       <ExplorerTree
@@ -1107,6 +1374,69 @@ export function App() {
                   <div className="branch-goal-card">
                     <span>Branch Goal</span>
                     <strong>{extractMarkdownTitle(branchGoalMarkdown) || demoBranchGoal.title}</strong>
+                  </div>
+                  <PanelTitle title="Branches" />
+                  <div className="branch-list">
+                    {branchSummaries.map((branch) => (
+                      <button
+                        className={branch.status === "current" ? "branch-row active" : "branch-row"}
+                        key={`${branch.role}:${branch.name}`}
+                        onClick={() => {
+                          setBranchName(branch.name);
+                          setBranchPushed(false);
+                          setCreatedPrUrl("");
+                        }}
+                      >
+                        <span>
+                          <GitBranch size={14} />
+                          <strong>{branch.name}</strong>
+                        </span>
+                        <small>{branch.label}</small>
+                        <em>ahead {branch.ahead} / behind {branch.behind}</em>
+                      </button>
+                    ))}
+                  </div>
+                  <PanelTitle title="Merge readiness" />
+                  <div className="merge-panel">
+                    <label className="branch-input compact">
+                      <span>Target</span>
+                      <input value={mergeTargetBranch} onChange={(event) => setMergeTargetBranch(event.target.value)} />
+                    </label>
+                    <button className="icon-action" onClick={() => setConflictDemoEnabled((enabled) => !enabled)}>
+                      <Merge size={15} />
+                      <span>{conflictDemoEnabled ? "競合デモ解除" : "競合デモ"}</span>
+                    </button>
+                    <ul className="readiness-list">
+                      {mergeReadiness.map((item) => (
+                        <li className={`readiness-${item.status}`} key={item.id}>
+                          {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                          <span>
+                            <strong>{item.label}</strong>
+                            {item.detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {conflictDemoEnabled ? (
+                      <div className="conflict-box">
+                        <strong>Conflict handling</strong>
+                        <span>src/features/pr-summary/generateSummary.ts の summary format 変更が main 側と競合する想定です。</span>
+                        <span>推奨: branch goal に合う出力契約を残し、PR description に解消理由を書きます。</span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <PanelTitle title="History" />
+                  <div className="history-list">
+                    {commitHistory.map((commit) => (
+                      <button className="history-item" key={`${commit.sha}:${commit.message}`}>
+                        <History size={14} />
+                        <span>
+                          <strong>{commit.message}</strong>
+                          <small>{commit.sha} / {commit.branch} / {commit.author}</small>
+                        </span>
+                        <em>{commit.time}</em>
+                      </button>
+                    ))}
                   </div>
                   <PanelTitle title="Changes" />
                   <div className="change-list">
@@ -1821,6 +2151,40 @@ function languageForFile(fileName: string) {
 
 function basename(fileName: string) {
   return fileName.split("/").at(-1) ?? fileName;
+}
+
+function normalizeWorkspacePath(path: string) {
+  return path
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/^\/+/, "")
+    .replace(/\/{2,}/g, "/");
+}
+
+function dirname(fileName: string) {
+  const parts = fileName.split("/");
+  parts.pop();
+  return parts.join("/");
+}
+
+function createInitialFileContent(fileName: string) {
+  const name = basename(fileName);
+  if (fileName.endsWith(".ts")) return `export function ${safeIdentifier(name.replace(/\.ts$/, ""))}() {\n  return null;\n}\n`;
+  if (fileName.endsWith(".tsx")) return `export function ${safeIdentifier(name.replace(/\.tsx$/, ""))}() {\n  return <div />;\n}\n`;
+  if (fileName.endsWith(".json")) return "{\n}\n";
+  if (fileName.endsWith(".md")) return `# ${name.replace(/\.md$/, "")}\n\n`;
+  return "";
+}
+
+function safeIdentifier(value: string) {
+  const identifier = value.replace(/[^A-Za-z0-9_$]/g, " ").replace(/\s+(\w)/g, (_match: string, letter: string) => letter.toUpperCase());
+  const normalized = identifier.charAt(0).toUpperCase() + identifier.slice(1);
+  return /^[A-Za-z_$]/.test(normalized) ? normalized : "GeneratedFile";
+}
+
+function suggestSiblingFilePath(fileName: string) {
+  const directory = dirname(fileName);
+  return directory ? `${directory}/new-file.md` : "new-file.md";
 }
 
 function selectPreferredFile(files: Record<string, string>) {

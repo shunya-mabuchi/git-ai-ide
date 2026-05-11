@@ -569,3 +569,25 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で E2E Diagnostics に GitHub App / WebLLM / Ollama / WebContainer の checklist が表示されることを確認
   - PR は GitHub issue #37 に `Closes #37` で紐づける
   - PR #41 を作成済み
+
+## GAI-025: Git branch / merge / conflict / history と file operations を実用化する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種類:機能`, `領域:git`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/38
+- 背景: IDE として使いやすくするには、単に diff を見るだけでなく、Explorer でファイルを作成・改名・削除でき、Source Control で branch、history、merge readiness、conflict handling の現在地を理解できる必要がある。
+- スコープ:
+  - Explorer に file create / rename / delete の UI を追加する
+  - Source Control に branch list / commit history / merge readiness を追加する
+  - conflict demo と解消方針を表示し、面接で説明できる workflow safety に接続する
+  - 変更後に typecheck / build / browser smoke を実行する
+- 受け入れ条件:
+  - Demo repo で新規ファイル作成、改名、削除が UI 上で変更として見える
+  - Source Control で branch list、history、merge readiness、conflict demo が確認できる
+  - typecheck / build / browser smoke が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Explorer file create と Source Control の branch/history/merge readiness を確認
+  - PR #42 を作成済み
