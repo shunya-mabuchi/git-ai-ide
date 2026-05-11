@@ -634,6 +634,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
 
+## GAI-028: CI と検証コマンドを公開前品質に整える
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/45
+- 背景: Playwright E2E が追加されたため、main に入る変更を GitHub Actions で typecheck / unit test / build / E2E まで確認できる状態にする。README からも同じ検証手順を読めるようにする。
+- スコープ:
+  - GitHub Actions workflow を追加する
+  - pnpm install / Playwright Chromium install / typecheck / test / build / E2E を CI で実行する
+  - README の検証コマンドに E2E と初回 browser install を追記する
+- 受け入れ条件:
+  - `.github/workflows/ci.yml` が存在する
+  - CI で主要検証コマンドが実行される
+  - README からローカル検証手順が分かる
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm -r test` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+
 ## GAI-027: Playwright E2E suite を追加する
 
 - 状態: 完了
