@@ -113,6 +113,7 @@ pnpm --filter @git-ai-ide/web test:e2e
 
 ## ドキュメント
 
+- [ドキュメント一覧](docs/README.md)
 - [デプロイ手順](docs/deployment.md)
 - [開発環境](docs/development.md)
 - [MVP 実装状況](docs/mvp-implementation-status.md)
