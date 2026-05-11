@@ -50,6 +50,13 @@ type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
 
+type SearchResult = {
+  file: string;
+  line: number;
+  matchType: "filename" | "content";
+  preview: string;
+};
+
 type ExplorerNode = {
   children: ExplorerNode[];
   name: string;
@@ -96,6 +103,7 @@ export function App() {
   const [explorerVisible, setExplorerVisible] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(["src", "src/features", "src/features/pr-summary"]));
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("explorer");
+  const [searchQuery, setSearchQuery] = useState("");
   const [assistantVisible, setAssistantVisible] = useState(true);
   const [bottomPanelMode, setBottomPanelMode] = useState<BottomPanelMode>("terminal");
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(false);
@@ -257,6 +265,7 @@ export function App() {
 
   const fileNames = useMemo(() => Object.keys(files).sort(), [files]);
   const explorerTree = useMemo(() => buildExplorerTree(fileNames), [fileNames]);
+  const searchResults = useMemo(() => searchWorkspace(files, searchQuery), [files, searchQuery]);
   const gitStatus = useMemo(
     () =>
       createSnapshotGitStatus({
@@ -765,12 +774,45 @@ export function App() {
                   <PanelTitle title="Search" />
                   <label className="search-box">
                     <Search size={15} />
-                    <input placeholder="ファイル名やコードを検索" />
+                    <input
+                      placeholder="ファイル名やコードを検索"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                    />
                   </label>
-                  <div className="empty-state">
-                    <strong>検索は次の実装対象です</strong>
-                    <p>まずはファイル名、次にコード全文検索と Context Pack への追加に対応します。</p>
-                  </div>
+                  {searchQuery.trim() ? (
+                    searchResults.length > 0 ? (
+                      <div className="search-results" aria-label="検索結果">
+                        {searchResults.map((result) => (
+                          <button
+                            className={result.file === selectedFile ? "search-result active" : "search-result"}
+                            key={`${result.file}:${result.matchType}:${result.line}:${result.preview}`}
+                            onClick={() => {
+                              openFile(result.file);
+                              setDiffOpen(false);
+                            }}
+                          >
+                            <span className="search-result-heading">
+                              <strong>{basename(result.file)}</strong>
+                              <small>{result.matchType === "filename" ? "file name" : `L${result.line}`}</small>
+                            </span>
+                            <span className="search-result-path">{result.file}</span>
+                            <span className="search-result-preview">{result.preview}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <strong>一致する結果はありません</strong>
+                        <p>検索語を短くするか、別のファイル名・関数名で探してください。</p>
+                      </div>
+                    )
+                  ) : (
+                    <div className="empty-state">
+                      <strong>workspace を横断検索できます</strong>
+                      <p>ファイル名、関数名、コメント、Markdown の本文を検索して editor に開けます。</p>
+                    </div>
+                  )}
                 </section>
               ) : null}
 
@@ -1349,6 +1391,46 @@ function buildExplorerTree(fileNames: string[]): ExplorerNode[] {
 function compareExplorerNodes(left: ExplorerNode, right: ExplorerNode) {
   if (left.type !== right.type) return left.type === "directory" ? -1 : 1;
   return left.name.localeCompare(right.name);
+}
+
+function searchWorkspace(files: Record<string, string>, query: string): SearchResult[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const results: SearchResult[] = [];
+  const maxResults = 80;
+  const maxContentMatchesPerFile = 5;
+
+  for (const file of Object.keys(files).sort()) {
+    if (results.length >= maxResults) break;
+
+    if (file.toLowerCase().includes(normalizedQuery)) {
+      results.push({
+        file,
+        line: 1,
+        matchType: "filename",
+        preview: "ファイル名に一致",
+      });
+    }
+
+    let contentMatches = 0;
+    const lines = files[file].split(/\r?\n/);
+
+    for (const [index, line] of lines.entries()) {
+      if (results.length >= maxResults || contentMatches >= maxContentMatchesPerFile) break;
+      if (!line.toLowerCase().includes(normalizedQuery)) continue;
+
+      results.push({
+        file,
+        line: index + 1,
+        matchType: "content",
+        preview: line.trim() || "(空行)",
+      });
+      contentMatches += 1;
+    }
+  }
+
+  return results;
 }
 
 function clamp(value: number, min: number, max: number) {

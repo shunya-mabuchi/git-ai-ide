@@ -216,7 +216,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-011: Editor tabs で複数ファイルを切り替えられるようにする
 
-- 状態: レビュー中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/11
@@ -237,3 +237,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - browser で複数 tab open / switch 表示を確認
   - PR は GitHub issue #11 に `Closes #11` で紐づける
+  - PR #12 を merge 済み
+
+## GAI-012: Search パネルでファイル名と本文を検索できるようにする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/13
+- 背景: Search パネルが入力欄だけの placeholder になっており、IDE として repo を探索する価値が弱い。
+- スコープ:
+  - workspace 内のファイル名検索
+  - workspace 内の本文検索
+  - 検索結果クリックで editor に file を開く
+  - 検索なし / 一致なし状態を日本語で表示する
+- 受け入れ条件:
+  - Search パネルで query を入力すると結果が表示される
+  - 結果に file path、match type、line、preview が表示される
+  - 結果クリックで該当 file が editor tab に開く
+  - demo repo で browser 確認できる
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Search panel の検索結果表示と file open を確認
+  - PR は GitHub issue #13 に `Closes #13` で紐づける
+  - PR #14 を merge 済み
