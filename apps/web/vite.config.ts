@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -15,5 +15,8 @@ export default defineConfig({
       "Cross-Origin-Opener-Policy": "same-origin",
     },
     port: 5173,
+  },
+  test: {
+    exclude: ["tests/e2e/**", "node_modules/**", "dist/**"],
   },
 });

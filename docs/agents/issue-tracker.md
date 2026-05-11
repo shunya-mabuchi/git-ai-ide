@@ -613,3 +613,26 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - browser で Assisted Memory controls と project key 表示を確認
   - PR #43 を作成済み
+
+## GAI-027: Playwright E2E suite を追加する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種類:テスト`, `領域:web`, `領域:workflow-safety`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/40
+- 背景: 主要機能が増えたため、Explorer、Git workflow、Assisted Memory などの回帰を手動確認だけに頼らない E2E suite が必要。
+- スコープ:
+  - Playwright 設定と `test:e2e` script を追加する
+  - Explorer file operation / Git panel / conflict demo を E2E で確認する
+  - Assisted Memory の保存・復元を E2E で確認する
+  - CI やローカルで実行しやすい dev server 連携を設定する
+- 受け入れ条件:
+  - `pnpm --filter @git-ai-ide/web test:e2e` で E2E が実行できる
+  - 主要 IDE workflow が自動テストで守られる
+  - typecheck / build / E2E が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm -r test` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+  - PR #44 を作成済み
