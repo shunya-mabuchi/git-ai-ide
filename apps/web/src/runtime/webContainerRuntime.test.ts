@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createWebContainerFileTree, splitCommand } from "./webContainerRuntime";
+import { createLocalPreviewPreflight, createWebContainerFileTree, splitCommand } from "./webContainerRuntime";
 
 describe("createWebContainerFileTree", () => {
   it("converts slash separated workspace files into a WebContainer tree", () => {
@@ -32,6 +32,67 @@ describe("splitCommand", () => {
     expect(splitCommand("npm run test")).toEqual({
       args: ["run", "test"],
       binary: "npm",
+    });
+  });
+});
+
+describe("createLocalPreviewPreflight", () => {
+  it("allows WebContainer preview when project, command, and browser are ready", () => {
+    const preflight = createLocalPreviewPreflight(
+      {
+        capability: "webcontainer",
+        confidence: "high",
+        devCommand: "npm run dev",
+        installCommand: "npm install",
+        warnings: [],
+      },
+      { canUseWebContainer: true },
+    );
+
+    expect(preflight).toMatchObject({
+      canAttemptWebContainer: true,
+      command: "npm run dev",
+      mode: "webcontainer",
+    });
+    expect(preflight.items.every((item) => item.status === "pass")).toBe(true);
+  });
+
+  it("records why preview falls back when browser isolation is missing", () => {
+    const preflight = createLocalPreviewPreflight(
+      {
+        capability: "webcontainer",
+        confidence: "high",
+        devCommand: "npm run dev",
+        installCommand: "npm install",
+        warnings: [],
+      },
+      { canUseWebContainer: false },
+    );
+
+    expect(preflight).toMatchObject({
+      canAttemptWebContainer: false,
+      mode: "recorded",
+    });
+    expect(preflight.items.find((item) => item.id === "browser")).toMatchObject({
+      status: "blocked",
+    });
+    expect(preflight.reason).toContain("cross-origin isolation");
+  });
+
+  it("records why preview falls back when no preview command exists", () => {
+    const preflight = createLocalPreviewPreflight(
+      {
+        capability: "webcontainer",
+        confidence: "medium",
+        installCommand: "npm install",
+        warnings: ["dev / preview script が見つかりません。"],
+      },
+      { canUseWebContainer: true },
+    );
+
+    expect(preflight.canAttemptWebContainer).toBe(false);
+    expect(preflight.items.find((item) => item.id === "command")).toMatchObject({
+      status: "blocked",
     });
   });
 });

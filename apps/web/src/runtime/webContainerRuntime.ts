@@ -13,7 +13,23 @@ export type LocalPreviewResult = {
   log: string;
   mode: RuntimeRunMode;
   ok: boolean;
+  preflight: LocalPreviewPreflight;
   url?: string;
+};
+
+export type LocalPreviewPreflightItem = {
+  detail: string;
+  id: "source" | "project" | "command" | "browser";
+  label: string;
+  status: "pass" | "warning" | "blocked";
+};
+
+export type LocalPreviewPreflight = {
+  canAttemptWebContainer: boolean;
+  command?: string;
+  items: LocalPreviewPreflightItem[];
+  mode: RuntimeRunMode;
+  reason: string;
 };
 
 type MutableFileSystemTree = Record<string, { directory?: MutableFileSystemTree; file?: { contents: string } }>;
@@ -77,30 +93,77 @@ export function canUseWebContainer() {
   return typeof window !== "undefined" && window.crossOriginIsolated && typeof window.SharedArrayBuffer !== "undefined";
 }
 
+export function createLocalPreviewPreflight(
+  plan: RuntimePlan,
+  options: { canUseWebContainer?: boolean; forceRecorded?: boolean } = {},
+): LocalPreviewPreflight {
+  const previewCommand = plan.devCommand ?? plan.previewCommand;
+  const browserReady = options.canUseWebContainer ?? canUseWebContainer();
+  const items: LocalPreviewPreflightItem[] = [
+    {
+      detail: options.forceRecorded ? "Demo workspace は高速な recorded preview を使います。" : "実 repo では WebContainer preview を試します。",
+      id: "source",
+      label: "Workspace source",
+      status: options.forceRecorded ? "warning" : "pass",
+    },
+    {
+      detail:
+        plan.capability === "webcontainer"
+          ? "package.json から JavaScript / TypeScript project として検出しました。"
+          : "package.json がないか、WebContainer 対象として扱えません。",
+      id: "project",
+      label: "Project capability",
+      status: plan.capability === "webcontainer" ? "pass" : "blocked",
+    },
+    {
+      detail: previewCommand ?? "package.json に dev または preview script がありません。",
+      id: "command",
+      label: "Preview command",
+      status: previewCommand ? "pass" : "blocked",
+    },
+    {
+      detail: browserReady
+        ? "cross-origin isolation と SharedArrayBuffer が有効です。"
+        : "WebContainer には cross-origin isolation と SharedArrayBuffer が必要です。",
+      id: "browser",
+      label: "Browser isolation",
+      status: browserReady ? "pass" : "blocked",
+    },
+  ];
+
+  const blocked = items.find((item) => item.status === "blocked");
+  const forced = options.forceRecorded;
+  const canAttemptWebContainer = !forced && !blocked;
+
+  return {
+    canAttemptWebContainer,
+    command: previewCommand,
+    items,
+    mode: canAttemptWebContainer ? "webcontainer" : "recorded",
+    reason: forced ? items[0].detail : blocked?.detail ?? "WebContainer dev server URL を iframe に接続します。",
+  };
+}
+
 export async function startLocalPreview(
   files: Record<string, string>,
   plan: RuntimePlan,
   options: { forceRecorded?: boolean } = {},
 ): Promise<LocalPreviewResult> {
-  const previewCommand = plan.devCommand ?? plan.previewCommand;
+  const preflight = createLocalPreviewPreflight(plan, {
+    forceRecorded: options.forceRecorded,
+  });
+  const previewCommand = preflight.command;
 
-  if (options.forceRecorded) {
-    return runRecordedPreview(plan, "Demo workspace では高速な recorded preview を使います。");
-  }
-
-  if (plan.capability !== "webcontainer") {
-    return runRecordedPreview(plan, "WebContainer 対象の JavaScript / TypeScript project として検出されませんでした。");
+  if (!preflight.canAttemptWebContainer) {
+    return runRecordedPreview(plan, preflight);
   }
 
   if (!previewCommand) {
-    return runRecordedPreview(plan, "dev / preview script が見つかりません。");
-  }
-
-  if (!canUseWebContainer()) {
-    return runRecordedPreview(
-      plan,
-      "このブラウザ環境では WebContainer に必要な cross-origin isolation が有効ではありません。",
-    );
+    return runRecordedPreview(plan, {
+      ...preflight,
+      mode: "recorded",
+      reason: "dev / preview script が見つかりません。",
+    });
   }
 
   try {
@@ -120,6 +183,7 @@ export async function startLocalPreview(
         log: output.join("\n"),
         mode: "webcontainer",
         ok: false,
+        preflight,
       };
     }
 
@@ -136,12 +200,18 @@ export async function startLocalPreview(
       log: output.join("\n"),
       mode: "webcontainer",
       ok: true,
+      preflight,
       url,
     };
   } catch (error) {
     return runRecordedPreview(
       plan,
-      error instanceof Error ? `WebContainer preview に失敗しました: ${error.message}` : "WebContainer preview に失敗しました。",
+      {
+        ...preflight,
+        mode: "recorded",
+        reason:
+          error instanceof Error ? `WebContainer preview に失敗しました: ${error.message}` : "WebContainer preview に失敗しました。",
+      },
     );
   }
 }
@@ -251,14 +321,17 @@ function runRecordedChecks(plan: RuntimePlan, reason: string): RuntimeRunResult 
   };
 }
 
-function runRecordedPreview(plan: RuntimePlan, reason: string): LocalPreviewResult {
+function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight): LocalPreviewResult {
   const previewCommand = plan.devCommand ?? plan.previewCommand;
 
   return {
     log: [
       "Git AI IDE Local Preview",
       "mode: Recorded fallback",
-      reason,
+      preflight.reason,
+      "",
+      "preflight:",
+      ...preflight.items.map((item) => `- ${item.status}: ${item.label} - ${item.detail}`),
       "",
       `detected capability: ${plan.capability}`,
       `install: ${plan.installCommand ?? "not detected"}`,
@@ -272,5 +345,6 @@ function runRecordedPreview(plan: RuntimePlan, reason: string): LocalPreviewResu
     ].join("\n"),
     mode: "recorded",
     ok: Boolean(previewCommand),
+    preflight,
   };
 }

@@ -40,7 +40,7 @@ import {
   supportsLocalDirectoryAccess,
   type WorkspaceSnapshot,
 } from "./workspace/localWorkspace";
-import { runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
+import { createLocalPreviewPreflight, runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
@@ -328,6 +328,13 @@ export function App() {
   const ollamaRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "ollama");
   const selectedRuntimeAvailable = selectedRuntimeHealth?.status === "available";
   const runtimePlan = useMemo(() => planRuntimeFromPackageJson(files), [files]);
+  const previewPreflight = useMemo(
+    () =>
+      createLocalPreviewPreflight(runtimePlan, {
+        forceRecorded: workspaceSource === "demo",
+      }),
+    [runtimePlan, workspaceSource],
+  );
   const safetyGate = useMemo(
     () =>
       evaluateSafetyGate({
@@ -1226,8 +1233,20 @@ export function App() {
                   <div className="preview-info">
                     <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
                     <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
-                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Recorded fallback" : canUsePreviewFrame(runtimePlan.capability) ? "WebContainer candidate" : "Recorded fallback"}</span>
+                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Recorded fallback" : previewPreflight.canAttemptWebContainer ? "WebContainer candidate" : "Recorded fallback"}</span>
+                    <span>{previewPreflight.reason}</span>
                     {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
+                    <ul className="preview-preflight">
+                      {previewPreflight.items.map((item) => (
+                        <li className={`preview-preflight-${item.status}`} key={item.id}>
+                          {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "warning" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                          <span>
+                            <strong>{item.label}</strong>
+                            {item.detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   {previewUrl ? (
                     <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
@@ -1622,10 +1641,6 @@ function searchWorkspace(files: Record<string, string>, query: string): SearchRe
   }
 
   return results;
-}
-
-function canUsePreviewFrame(capability: string) {
-  return capability === "webcontainer";
 }
 
 function revealEditorLine(editor: Parameters<OnMount>[0] | null, line: number) {
