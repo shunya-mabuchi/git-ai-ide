@@ -15,7 +15,7 @@ import {
 import type { PointerEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Editor, { DiffEditor } from "@monaco-editor/react";
-import { planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
+import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
 import { evaluateSafetyGate } from "@git-ai-ide/shared";
@@ -95,6 +95,8 @@ export function App() {
   const [isPushingBranch, setIsPushingBranch] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
+  const [aiRuntimeStatus, setAiRuntimeStatus] = useState(createDefaultRuntimeStatus());
+  const [aiRuntimeCheckState, setAiRuntimeCheckState] = useState<"checking" | "ready">("checking");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
@@ -105,6 +107,29 @@ export function App() {
       setExplorerVisible(false);
       setAssistantVisible(false);
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setAiRuntimeCheckState("checking");
+    detectBrowserAiRuntime()
+      .then((status) => {
+        if (cancelled) return;
+        setAiRuntimeStatus(status);
+        setAiRuntimeMode(status.recommendedProvider);
+        setAiRuntimeCheckState("ready");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAiRuntimeStatus(createDefaultRuntimeStatus());
+        setAiRuntimeMode("recorded");
+        setAiRuntimeCheckState("ready");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -213,12 +238,15 @@ export function App() {
     [assistedMemory, branchGoalMarkdown, currentFile, fileNames.length, gitStatus.entries.length, taskPriority],
   );
   const runtimeSuggestion = suggestRuntimeMode({
+    aiRuntimeStatus,
     budgetRatio: contextBudget.used / contextBudget.limit,
     changeCount: gitStatus.entries.length,
     fileCount: fileNames.length,
     priority: taskPriority,
   });
   const selectedRuntimeLabel = runtimeLabels[aiRuntimeMode];
+  const selectedRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === aiRuntimeMode);
+  const selectedRuntimeAvailable = selectedRuntimeHealth?.status === "available";
   const runtimePlan = useMemo(() => planRuntimeFromPackageJson(files), [files]);
   const safetyGate = useMemo(
     () =>
@@ -226,13 +254,13 @@ export function App() {
         branchGoalSet: Boolean(branchGoalMarkdown.trim()),
         commitCreated,
         contextPackReviewed: true,
-        modelAccepted: true,
+        modelAccepted: selectedRuntimeAvailable,
         patchReviewed: patchApplied || commitCreated,
         prDraftGenerated,
         testsPassed: testsRun,
         unresolvedWarnings: runtimePlan.warnings.length,
       }),
-    [branchGoalMarkdown, commitCreated, patchApplied, prDraftGenerated, runtimePlan.warnings.length, testsRun],
+    [branchGoalMarkdown, commitCreated, patchApplied, prDraftGenerated, runtimePlan.warnings.length, selectedRuntimeAvailable, testsRun],
   );
   const currentStep = commitCreated ? "Commit draft 作成済み" : testsRun ? "PR 作成待ち" : patchApplied ? "Tests 実行待ち" : "変更中";
   const safetyStatus = testsRun
@@ -902,18 +930,24 @@ export function App() {
                 <div className="runtime-grid">
                   {(["recorded", "webllm", "ollama"] as const).map((runtime) => (
                     <button
-                      className={aiRuntimeMode === runtime ? "runtime-card active" : "runtime-card"}
+                      className={runtimeCardClassName(
+                        aiRuntimeMode,
+                        runtime,
+                        aiRuntimeStatus.providers.find((provider) => provider.provider === runtime)?.status,
+                      )}
                       key={runtime}
                       onClick={() => setAiRuntimeMode(runtime)}
                     >
                       <strong>{runtimeLabels[runtime]}</strong>
                       <span>{runtimeDescriptions[runtime]}</span>
+                      <small>{runtimeProviderLabel(aiRuntimeStatus, runtime)}</small>
                     </button>
                   ))}
                 </div>
                 <div className="routing-note">
                   <strong>Suggestion: {runtimeLabels[runtimeSuggestion]}</strong>
                   <span>Selected: {selectedRuntimeLabel}</span>
+                  <span>{aiRuntimeCheckState === "checking" ? "runtime を確認中" : selectedRuntimeHealth?.detail}</span>
                 </div>
               </section>
 
@@ -1092,20 +1126,45 @@ function createContextBudget(input: {
 }
 
 function suggestRuntimeMode(input: {
+  aiRuntimeStatus: ReturnType<typeof createDefaultRuntimeStatus>;
   budgetRatio: number;
   changeCount: number;
   fileCount: number;
   priority: TaskPriority;
 }): AiRuntimeMode {
-  if (input.priority === "deep" || input.budgetRatio > 0.85 || input.changeCount > 8 || input.fileCount > 80) {
+  const providerAvailable = (provider: AiRuntimeMode) =>
+    input.aiRuntimeStatus.providers.some((runtimeProvider) => runtimeProvider.provider === provider && runtimeProvider.status === "available");
+
+  if (
+    providerAvailable("ollama") &&
+    (input.priority === "deep" || input.budgetRatio > 0.85 || input.changeCount > 8 || input.fileCount > 80)
+  ) {
     return "ollama";
   }
 
-  if (input.priority === "fast" && input.changeCount <= 1 && input.budgetRatio < 0.55) {
+  if (providerAvailable("webllm") && input.priority === "fast" && input.changeCount <= 1 && input.budgetRatio < 0.55) {
     return "webllm";
   }
 
   return "recorded";
+}
+
+function runtimeCardClassName(
+  selectedRuntime: AiRuntimeMode,
+  runtime: AiRuntimeMode,
+  status: "available" | "unavailable" | "checking" | undefined,
+) {
+  return ["runtime-card", selectedRuntime === runtime ? "active" : "", status ? `runtime-card-${status}` : ""]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function runtimeProviderLabel(status: ReturnType<typeof createDefaultRuntimeStatus>, runtime: AiRuntimeMode) {
+  const provider = status.providers.find((runtimeProvider) => runtimeProvider.provider === runtime);
+
+  if (!provider) return "未確認";
+  if (provider.modelIds.length > 0) return `${provider.label}: ${provider.modelIds.slice(0, 2).join(", ")}`;
+  return provider.label;
 }
 
 function estimateTokens(text: string) {

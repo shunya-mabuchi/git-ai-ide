@@ -101,7 +101,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-005: WebLLM と Ollama の実 runtime 検出
 
-- 状態: 要整理
+- 状態: レビュー中
 - ラベル: `種別:機能`, `領域:ai-runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/2
@@ -116,8 +116,11 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - 失敗時は Recorded AI に fallback する
   - cloud LLM を必須にしない
 - 検証:
-  - browser runtime checks
-  - typecheck/build
+  - browser runtime checks 成功
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - PR は GitHub issue #2 に `Closes #2` で紐づける
 
 ## GAI-006: WebContainer で test/typecheck を実行する
 
