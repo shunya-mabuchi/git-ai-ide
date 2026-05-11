@@ -34,6 +34,7 @@ import {
   supportsLocalDirectoryAccess,
   type WorkspaceSnapshot,
 } from "./workspace/localWorkspace";
+import { runRuntimeChecks } from "./runtime/webContainerRuntime";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
@@ -77,6 +78,8 @@ export function App() {
   const [bottomPanelMode, setBottomPanelMode] = useState<BottomPanelMode>("terminal");
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(false);
   const [testsRun, setTestsRun] = useState(false);
+  const [runtimeRunState, setRuntimeRunState] = useState<"idle" | "running">("idle");
+  const [runtimeLog, setRuntimeLog] = useState(demoTestLogIdle);
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [branchName, setBranchName] = useState("feature/pr-summary");
@@ -309,6 +312,7 @@ export function App() {
     setFiles(preview.files);
     setPatchApplied(true);
     setTestsRun(false);
+    setRuntimeLog(demoTestLogIdle);
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
@@ -316,10 +320,18 @@ export function App() {
     setDiffOpen(false);
   };
 
-  const runDemoTests = () => {
+  const runWorkspaceChecks = async () => {
     if (!patchApplied) return;
-    setTestsRun(true);
+
+    setRuntimeRunState("running");
     setBottomPanelMode("terminal");
+    setBottomPanelCollapsed(false);
+    setRuntimeLog("Git AI IDE Runtime\nchecks を実行中...");
+
+    const result = await runRuntimeChecks(files, runtimePlan);
+    setRuntimeLog(result.log);
+    setTestsRun(result.ok);
+    setRuntimeRunState("idle");
   };
 
   const pushBranch = async () => {
@@ -378,6 +390,7 @@ export function App() {
       setDiffOpen(false);
       setPatchApplied(false);
       setTestsRun(false);
+      setRuntimeLog(demoTestLogIdle);
       setPrDraftGenerated(false);
       setCommitMessage("");
       setCommitCreated(false);
@@ -402,6 +415,7 @@ export function App() {
     setDiffOpen(false);
     setPatchApplied(false);
     setTestsRun(false);
+    setRuntimeLog(demoTestLogIdle);
     setPrDraftGenerated(false);
     setBranchName("feature/pr-summary");
     setCommitMessage("");
@@ -419,6 +433,7 @@ export function App() {
       [selectedFile]: value ?? "",
     }));
     setTestsRun(false);
+    setRuntimeLog(demoTestLogIdle);
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
@@ -831,8 +846,8 @@ export function App() {
               >
                 出力
               </button>
-              <button className="button secondary run-tests" disabled={!patchApplied || testsRun} onClick={runDemoTests}>
-                <Play size={15} /> デモテストを実行
+              <button className="button secondary run-tests" disabled={!patchApplied || testsRun || runtimeRunState === "running"} onClick={runWorkspaceChecks}>
+                <Play size={15} /> {runtimeRunState === "running" ? "実行中" : "Runtime checks"}
               </button>
               <button className="button ghost collapse-bottom" onClick={() => setBottomPanelCollapsed((collapsed) => !collapsed)}>
                 {bottomPanelCollapsed ? "開く" : "閉じる"}
@@ -855,7 +870,7 @@ export function App() {
                 )
               ) : null}
               {bottomPanelMode === "terminal" ? (
-                <pre className="terminal-view">{testsRun ? demoTestLogPassed : demoTestLogIdle}</pre>
+                <pre className="terminal-view">{runtimeLog}</pre>
               ) : null}
               {bottomPanelMode === "output" ? (
                 prDraftGenerated ? (

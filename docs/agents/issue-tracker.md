@@ -101,7 +101,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-005: WebLLM と Ollama の実 runtime 検出
 
-- 状態: レビュー中
+- 状態: 完了
 - ラベル: `種別:機能`, `領域:ai-runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/2
@@ -121,10 +121,11 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm -r typecheck` 成功
   - `pnpm --filter @git-ai-ide/web build` 成功
   - PR は GitHub issue #2 に `Closes #2` で紐づける
+  - PR #5 を merge 済み
 
 ## GAI-006: WebContainer で test/typecheck を実行する
 
-- 状態: 要整理
+- 状態: レビュー中
 - ラベル: `種別:機能`, `領域:runtime`, `優先度:p2`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/3
@@ -137,8 +138,12 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - 非対応 repo では best-effort の説明を表示
   - JS/TS demo repo で recorded または real test path を実行できる
 - 検証:
-  - browser test
-  - typecheck/build
+  - browser test 成功
+  - WebContainer 上で demo repo の `npm run typecheck` / `npm run test` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - PR は GitHub issue #3 に `Closes #3` で紐づける
 
 ## GAI-008: Markdown ドキュメントを日本語へ統一する
 

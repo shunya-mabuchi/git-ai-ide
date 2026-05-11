@@ -284,13 +284,14 @@ export function planRuntimeFromPackageJson(files: Record<string, string>): Runti
   try {
     const parsed = JSON.parse(packageJson) as { scripts?: Record<string, string> };
     const scripts = parsed.scripts ?? {};
+    const packageManager = detectPackageManager(files);
 
     return {
       capability: "webcontainer",
       confidence: scripts.test || scripts.typecheck ? "high" : "medium",
-      installCommand: "pnpm install",
-      testCommand: scripts.test ? "pnpm test" : undefined,
-      typecheckCommand: scripts.typecheck ? "pnpm typecheck" : undefined,
+      installCommand: `${packageManager} install`,
+      testCommand: scripts.test ? `${packageManager} run test` : undefined,
+      typecheckCommand: scripts.typecheck ? `${packageManager} run typecheck` : undefined,
       warnings: scripts.test ? [] : ["test script が見つかりません。"],
     };
   } catch {
@@ -300,4 +301,10 @@ export function planRuntimeFromPackageJson(files: Record<string, string>): Runti
       warnings: ["package.json を解析できませんでした。"],
     };
   }
+}
+
+function detectPackageManager(files: Record<string, string>) {
+  if (files["pnpm-lock.yaml"]) return "pnpm";
+  if (files["yarn.lock"]) return "yarn";
+  return "npm";
 }
