@@ -470,3 +470,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で診断結果の proposal が Patch Queue に反映されることを確認
   - PR は GitHub issue #29 に `Closes #29` で紐づける
   - PR #30 を作成済み
+
+## GAI-021: Local Preview の WebContainer preflight を可視化する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/31
+- 背景: Local Preview は実装済みだが、実 repo を開いたときに WebContainer を試せる条件、使えない理由、fallback の判断が UI 上で説明しづらい。任意 repo を best effort で確認する設計を明確に見せる必要がある。
+- スコープ:
+  - Runtime Plan から Local Preview の preflight checklist を作る
+  - WebContainer 利用可否、command、fallback reason を UI に表示する
+  - startLocalPreview の recorded fallback log と UI 表示を同じ診断情報に寄せる
+  - preview readiness の unit test を追加する
+- 受け入れ条件:
+  - Preview パネルで WebContainer / Recorded fallback の理由が読める
+  - package.json がない repo、dev script がない repo、cross-origin isolation 不足の差分を説明できる
+  - web test / typecheck / web build が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Preview パネルに Workspace source / Project capability / Preview command / Browser isolation が表示されることを確認
+  - browser で Demo workspace が Recorded fallback として表示されることを確認
+  - PR は GitHub issue #31 に `Closes #31` で紐づける
+  - PR #32 を作成済み
