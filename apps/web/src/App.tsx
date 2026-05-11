@@ -22,7 +22,7 @@ import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson, requestPatchProposal } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
-import { evaluateSafetyGate, type PatchProposal } from "@git-ai-ide/shared";
+import { evaluatePullRequestFlow, evaluateSafetyGate, type PatchProposal } from "@git-ai-ide/shared";
 import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
@@ -350,6 +350,20 @@ export function App() {
         unresolvedWarnings: runtimePlan.warnings.length,
       }),
     [branchGoalMarkdown, branchPushed, commitCreated, patchApplied, previewRunState, prDraftGenerated, runtimePlan.warnings.length, selectedRuntimeAvailable, testsRun],
+  );
+  const pullRequestFlow = useMemo(
+    () =>
+      evaluatePullRequestFlow({
+        baseBranch: "main",
+        branch: branchName,
+        branchPushed,
+        createdPrUrl,
+        githubConfigured,
+        installationSelected: Boolean(selectedInstallationId),
+        repository: selectedRepository,
+        safetyGateReady: safetyGate.canCreatePullRequest,
+      }),
+    [branchName, branchPushed, createdPrUrl, githubConfigured, safetyGate.canCreatePullRequest, selectedInstallationId, selectedRepository],
   );
   const currentStep = commitCreated ? "Commit draft 作成済み" : testsRun ? "PR 作成待ち" : patchApplied ? "Tests 実行待ち" : "変更中";
   const safetyStatus = testsRun
@@ -1072,6 +1086,17 @@ export function App() {
                     <span>{branchPushed ? "branch pushed" : "push pending"}</span>
                     {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}
+                    <ul className="github-readiness">
+                      {pullRequestFlow.items.map((item) => (
+                        <li className={`github-readiness-${item.status}`} key={item.id}>
+                          {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                          <span>
+                            <strong>{item.label}</strong>
+                            {item.detail}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   {commitCreated ? (
                     <div className="commit-box">

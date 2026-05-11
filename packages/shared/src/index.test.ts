@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateSafetyGate } from "./index";
+import { evaluatePullRequestFlow, evaluateSafetyGate } from "./index";
 
 const readyInput = {
   branchGoalSet: true,
@@ -52,6 +52,63 @@ describe("evaluateSafetyGate", () => {
     });
     expect(result.items.find((item) => item.id === "preview")).toMatchObject({
       status: "warning",
+    });
+  });
+});
+
+describe("evaluatePullRequestFlow", () => {
+  it("marks demo mode ready when safety gate and branch push are complete", () => {
+    expect(
+      evaluatePullRequestFlow({
+        baseBranch: "main",
+        branch: "feature/demo",
+        branchPushed: true,
+        githubConfigured: false,
+        installationSelected: false,
+        repository: "demo/pr-helper-mini",
+        safetyGateReady: true,
+      }),
+    ).toMatchObject({
+      canCreatePullRequest: true,
+      mode: "demo",
+      summary: "ready",
+    });
+  });
+
+  it("waits for branch push before PR creation", () => {
+    const result = evaluatePullRequestFlow({
+      baseBranch: "main",
+      branch: "feature/demo",
+      branchPushed: false,
+      githubConfigured: false,
+      installationSelected: false,
+      repository: "demo/pr-helper-mini",
+      safetyGateReady: true,
+    });
+
+    expect(result).toMatchObject({
+      canCreatePullRequest: false,
+      summary: "waiting",
+    });
+    expect(result.items.find((item) => item.id === "push")).toMatchObject({
+      status: "warning",
+    });
+  });
+
+  it("blocks GitHub App mode until an installation is selected", () => {
+    const result = evaluatePullRequestFlow({
+      baseBranch: "main",
+      branch: "feature/demo",
+      branchPushed: true,
+      githubConfigured: true,
+      installationSelected: false,
+      repository: "owner/repo",
+      safetyGateReady: true,
+    });
+
+    expect(result.canCreatePullRequest).toBe(false);
+    expect(result.items.find((item) => item.id === "mode")).toMatchObject({
+      status: "blocked",
     });
   });
 });
