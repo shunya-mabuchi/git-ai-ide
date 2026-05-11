@@ -289,3 +289,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で Preview tab と Local Preview 起動状態を確認
   - PR は GitHub issue #15 に `Closes #15` で紐づける
   - PR #16 を merge 済み
+
+## GAI-014: WebContainer dev server を Local Preview に接続する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/17
+- 背景: Local Preview は Preview tab と fallback 表示まで実装済みだが、WebContainer の dev server URL を取得して画面に接続する境界がまだない。IDE としてローカル確認の価値を出すには、対応環境で実 preview URL を扱える必要がある。
+- スコープ:
+  - WebContainer で install command を実行する
+  - dev / preview command を起動する
+  - server-ready URL を取得する
+  - Preview panel に iframe を表示する
+  - WebContainer 非対応環境では recorded fallback を維持する
+- 受け入れ条件:
+  - Local Preview ボタンが async runtime を呼ぶ
+  - WebContainer 対応環境では preview URL を state に保持できる
+  - preview URL がある場合は iframe を表示する
+  - 非対応環境では fallback log と説明が表示される
+  - typecheck / build / browser 確認が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で demo workspace の Local Preview recorded fallback を確認
+  - PR は GitHub issue #17 に `Closes #17` で紐づける
+  - PR #18 を merge 済み

@@ -1,5 +1,5 @@
 import type { RuntimePlan } from "@git-ai-ide/shared";
-import type { FileSystemTree, WebContainer } from "@webcontainer/api";
+import type { FileSystemTree, WebContainer, WebContainerProcess } from "@webcontainer/api";
 
 export type RuntimeRunMode = "webcontainer" | "recorded";
 
@@ -9,9 +9,17 @@ export type RuntimeRunResult = {
   ok: boolean;
 };
 
+export type LocalPreviewResult = {
+  log: string;
+  mode: RuntimeRunMode;
+  ok: boolean;
+  url?: string;
+};
+
 type MutableFileSystemTree = Record<string, { directory?: MutableFileSystemTree; file?: { contents: string } }>;
 
 let webContainerPromise: Promise<WebContainer> | undefined;
+let previewProcess: WebContainerProcess | undefined;
 
 export async function runRuntimeChecks(files: Record<string, string>, plan: RuntimePlan): Promise<RuntimeRunResult> {
   if (plan.capability !== "webcontainer") {
@@ -69,6 +77,75 @@ export function canUseWebContainer() {
   return typeof window !== "undefined" && window.crossOriginIsolated && typeof window.SharedArrayBuffer !== "undefined";
 }
 
+export async function startLocalPreview(
+  files: Record<string, string>,
+  plan: RuntimePlan,
+  options: { forceRecorded?: boolean } = {},
+): Promise<LocalPreviewResult> {
+  const previewCommand = plan.devCommand ?? plan.previewCommand;
+
+  if (options.forceRecorded) {
+    return runRecordedPreview(plan, "Demo workspace では高速な recorded preview を使います。");
+  }
+
+  if (plan.capability !== "webcontainer") {
+    return runRecordedPreview(plan, "WebContainer 対象の JavaScript / TypeScript project として検出されませんでした。");
+  }
+
+  if (!previewCommand) {
+    return runRecordedPreview(plan, "dev / preview script が見つかりません。");
+  }
+
+  if (!canUseWebContainer()) {
+    return runRecordedPreview(
+      plan,
+      "このブラウザ環境では WebContainer に必要な cross-origin isolation が有効ではありません。",
+    );
+  }
+
+  try {
+    const { WebContainer } = await import("@webcontainer/api");
+    webContainerPromise ??= WebContainer.boot();
+    const container = await webContainerPromise;
+    await container.mount(createWebContainerFileTree(files));
+
+    const output: string[] = ["Git AI IDE Local Preview", "mode: WebContainer"];
+    const installCommand = plan.installCommand ?? "npm install";
+    output.push("", `> ${installCommand}`);
+    const installResult = await runCommand(container, installCommand, (chunk) => output.push(chunk));
+
+    if (installResult !== 0) {
+      output.push(`install failed with exit code ${installResult}`);
+      return {
+        log: output.join("\n"),
+        mode: "webcontainer",
+        ok: false,
+      };
+    }
+
+    output.push("", `> ${previewCommand}`);
+    previewProcess?.kill();
+    const { args, binary } = splitCommand(previewCommand);
+    previewProcess = await container.spawn(binary, args);
+    previewProcess.output.pipeTo(createOutputSink((chunk) => output.push(chunk)));
+
+    const url = await waitForServerReady(container);
+    output.push("", `Preview ready: ${url}`);
+
+    return {
+      log: output.join("\n"),
+      mode: "webcontainer",
+      ok: true,
+      url,
+    };
+  } catch (error) {
+    return runRecordedPreview(
+      plan,
+      error instanceof Error ? `WebContainer preview に失敗しました: ${error.message}` : "WebContainer preview に失敗しました。",
+    );
+  }
+}
+
 export function createWebContainerFileTree(files: Record<string, string>): FileSystemTree {
   const root: MutableFileSystemTree = {};
 
@@ -112,17 +189,34 @@ export function splitCommand(command: string) {
 async function runCommand(container: WebContainer, command: string, onOutput: (chunk: string) => void) {
   const { args, binary } = splitCommand(command);
   const process = await container.spawn(binary, args);
-  process.output.pipeTo(
-    new WritableStream({
-      write(data) {
-        const cleaned = cleanTerminalOutput(data);
-        if (cleaned.trim()) {
-          onOutput(cleaned);
-        }
-      },
-    }),
-  );
+  process.output.pipeTo(createOutputSink(onOutput));
   return process.exit;
+}
+
+function createOutputSink(onOutput: (chunk: string) => void) {
+  return new WritableStream<string>({
+    write(data) {
+      const cleaned = cleanTerminalOutput(data);
+      if (cleaned.trim()) {
+        onOutput(cleaned);
+      }
+    },
+  });
+}
+
+function waitForServerReady(container: WebContainer) {
+  return new Promise<string>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      unsubscribe();
+      reject(new Error("dev server の起動待ちが timeout しました。"));
+    }, 30_000);
+
+    const unsubscribe = container.on("server-ready", (_port, url) => {
+      window.clearTimeout(timeoutId);
+      unsubscribe();
+      resolve(url);
+    });
+  });
 }
 
 function cleanTerminalOutput(data: string) {
@@ -154,5 +248,29 @@ function runRecordedChecks(plan: RuntimePlan, reason: string): RuntimeRunResult 
     ].join("\n"),
     mode: "recorded",
     ok: true,
+  };
+}
+
+function runRecordedPreview(plan: RuntimePlan, reason: string): LocalPreviewResult {
+  const previewCommand = plan.devCommand ?? plan.previewCommand;
+
+  return {
+    log: [
+      "Git AI IDE Local Preview",
+      "mode: Recorded fallback",
+      reason,
+      "",
+      `detected capability: ${plan.capability}`,
+      `install: ${plan.installCommand ?? "not detected"}`,
+      `dev: ${plan.devCommand ?? "not detected"}`,
+      `preview: ${plan.previewCommand ?? "not detected"}`,
+      `build: ${plan.buildCommand ?? "not detected"}`,
+      "",
+      previewCommand
+        ? "対応環境では WebContainer dev server URL を iframe に接続します。"
+        : "dev / preview script を追加すると Local Preview の候補になります。",
+    ].join("\n"),
+    mode: "recorded",
+    ok: Boolean(previewCommand),
   };
 }

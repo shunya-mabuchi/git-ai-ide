@@ -40,7 +40,7 @@ import {
   supportsLocalDirectoryAccess,
   type WorkspaceSnapshot,
 } from "./workspace/localWorkspace";
-import { runRuntimeChecks } from "./runtime/webContainerRuntime";
+import { runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
@@ -112,6 +112,8 @@ export function App() {
   const [runtimeLog, setRuntimeLog] = useState(demoTestLogIdle);
   const [previewRunState, setPreviewRunState] = useState<"idle" | "running" | "ready">("idle");
   const [previewLog, setPreviewLog] = useState("Local Preview はまだ起動していません。");
+  const [previewMode, setPreviewMode] = useState<"candidate" | "recorded" | "webcontainer">("candidate");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [branchName, setBranchName] = useState("feature/pr-summary");
@@ -441,20 +443,21 @@ export function App() {
     setRuntimeRunState("idle");
   };
 
-  const runLocalPreview = () => {
+  const runLocalPreview = async () => {
     setPreviewRunState("running");
     setBottomPanelMode("preview");
     setBottomPanelCollapsed(false);
+    setPreviewUrl("");
+    setPreviewMode("candidate");
+    setPreviewLog("Git AI IDE Local Preview\npreview を起動中...");
 
-    const log = createLocalPreviewLog({
-      plan: runtimePlan,
-      workspaceName,
+    const result = await startLocalPreview(files, runtimePlan, {
+      forceRecorded: workspaceSource === "demo",
     });
-
-    window.setTimeout(() => {
-      setPreviewLog(log);
-      setPreviewRunState("ready");
-    }, 300);
+    setPreviewLog(result.log);
+    setPreviewMode(result.mode);
+    setPreviewUrl(result.url ?? "");
+    setPreviewRunState(result.ok ? "ready" : "idle");
   };
 
   const pushBranch = async () => {
@@ -518,6 +521,8 @@ export function App() {
       setRuntimeLog(demoTestLogIdle);
       setPreviewRunState("idle");
       setPreviewLog("Local Preview はまだ起動していません。");
+      setPreviewMode("candidate");
+      setPreviewUrl("");
       setPrDraftGenerated(false);
       setCommitMessage("");
       setCommitCreated(false);
@@ -546,6 +551,8 @@ export function App() {
     setRuntimeLog(demoTestLogIdle);
     setPreviewRunState("idle");
     setPreviewLog("Local Preview はまだ起動していません。");
+    setPreviewMode("candidate");
+    setPreviewUrl("");
     setPrDraftGenerated(false);
     setBranchName("feature/pr-summary");
     setCommitMessage("");
@@ -1101,17 +1108,22 @@ export function App() {
                   <div className="preview-info">
                     <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
                     <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
-                    <span>mode: {canUsePreviewFrame(runtimePlan.capability) ? "WebContainer candidate" : "Recorded fallback"}</span>
+                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Recorded fallback" : canUsePreviewFrame(runtimePlan.capability) ? "WebContainer candidate" : "Recorded fallback"}</span>
+                    {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
                   </div>
-                  <div className="preview-frame">
-                    <strong>{workspaceName}</strong>
-                    <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
-                    <p>
-                      {previewAvailable
-                        ? "この領域に dev server の画面を表示する想定です。現在は安全な recorded preview として、起動コマンド・制約・次アクションを確認できます。"
-                        : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
-                    </p>
-                  </div>
+                  {previewUrl ? (
+                    <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
+                  ) : (
+                    <div className="preview-frame">
+                      <strong>{workspaceName}</strong>
+                      <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
+                      <p>
+                        {previewAvailable
+                          ? "対応環境では dev server の URL を取得し、この領域に iframe として表示します。非対応環境では recorded fallback として確認手順を表示します。"
+                          : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
+                      </p>
+                    </div>
+                  )}
                   <pre className="preview-log">{previewLog}</pre>
                 </div>
               ) : null}
@@ -1489,35 +1501,6 @@ function searchWorkspace(files: Record<string, string>, query: string): SearchRe
 
 function canUsePreviewFrame(capability: string) {
   return capability === "webcontainer";
-}
-
-function createLocalPreviewLog({ plan, workspaceName }: { plan: ReturnType<typeof planRuntimeFromPackageJson>; workspaceName: string }) {
-  const previewCommand = plan.devCommand ?? plan.previewCommand;
-
-  if (!previewCommand) {
-    return [
-      "Git AI IDE Local Preview",
-      "mode: Recorded fallback",
-      `${workspaceName} では dev / preview script を検出できませんでした。`,
-      "",
-      "次の確認:",
-      "- package.json に dev script があるか確認",
-      "- build / test command がある場合は Runtime checks を実行",
-    ].join("\n");
-  }
-
-  return [
-    "Git AI IDE Local Preview",
-    "mode: Recorded fallback",
-    "",
-    `workspace: ${workspaceName}`,
-    `install: ${plan.installCommand ?? "not detected"}`,
-    `preview: ${previewCommand}`,
-    plan.buildCommand ? `build: ${plan.buildCommand}` : "build: not detected",
-    "",
-    "Preview ready.",
-    "WebContainer dev server iframe 接続は次の縦割りで実装します。",
-  ].join("\n");
 }
 
 function clamp(value: number, min: number, max: number) {
