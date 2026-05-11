@@ -143,6 +143,31 @@ export type PullRequestResult = {
   url: string;
 };
 
+export type PullRequestFlowInput = {
+  baseBranch: string;
+  branch: string;
+  branchPushed: boolean;
+  createdPrUrl?: string;
+  githubConfigured: boolean;
+  installationSelected: boolean;
+  repository: string;
+  safetyGateReady: boolean;
+};
+
+export type PullRequestFlowItem = {
+  detail: string;
+  id: "mode" | "repository" | "branch" | "push" | "pr";
+  label: string;
+  status: "pass" | "warning" | "blocked";
+};
+
+export type PullRequestFlowReadiness = {
+  canCreatePullRequest: boolean;
+  items: PullRequestFlowItem[];
+  mode: "demo" | "github";
+  summary: "created" | "ready" | "waiting";
+};
+
 export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
   const items: SafetyGateItem[] = [
     {
@@ -219,5 +244,64 @@ export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
         : canCreateCommit
           ? "ready_for_commit"
           : "needs_review",
+  };
+}
+
+export function evaluatePullRequestFlow(input: PullRequestFlowInput): PullRequestFlowReadiness {
+  const mode = input.githubConfigured ? "github" : "demo";
+  const repositorySelected = Boolean(input.repository.trim());
+  const branchSelected = Boolean(input.branch.trim());
+  const installationReady = mode === "demo" || input.installationSelected;
+  const created = Boolean(input.createdPrUrl);
+  const canCreatePullRequest =
+    input.safetyGateReady && input.branchPushed && repositorySelected && branchSelected && installationReady && !created;
+
+  const items: PullRequestFlowItem[] = [
+    {
+      detail:
+        mode === "github"
+          ? input.installationSelected
+            ? "GitHub App installation を選択済みです。"
+            : "GitHub App mode では installation 選択が必要です。"
+          : "GitHub secrets 未設定時は demo mode で PR flow を確認します。",
+      id: "mode",
+      label: mode === "github" ? "GitHub App mode" : "Demo mode",
+      status: mode === "github" && !input.installationSelected ? "blocked" : "pass",
+    },
+    {
+      detail: repositorySelected ? `${input.repository} -> ${input.baseBranch}` : "PR 対象 repository が未選択です。",
+      id: "repository",
+      label: "Repository target",
+      status: repositorySelected ? "pass" : "blocked",
+    },
+    {
+      detail: branchSelected ? input.branch : "PR 用 branch が未設定です。",
+      id: "branch",
+      label: "Branch",
+      status: branchSelected ? "pass" : "blocked",
+    },
+    {
+      detail: input.branchPushed ? "PR 作成前の branch push が完了しています。" : "PR 作成前に branch push が必要です。",
+      id: "push",
+      label: "Branch push",
+      status: input.branchPushed ? "pass" : "warning",
+    },
+    {
+      detail: created
+        ? input.createdPrUrl ?? ""
+        : canCreatePullRequest
+          ? "PR 作成を実行できます。"
+          : "Safety Gate と branch push が揃うまで待機します。",
+      id: "pr",
+      label: "Pull request",
+      status: created || canCreatePullRequest ? "pass" : "warning",
+    },
+  ];
+
+  return {
+    canCreatePullRequest,
+    items,
+    mode,
+    summary: created ? "created" : canCreatePullRequest ? "ready" : "waiting",
   };
 }

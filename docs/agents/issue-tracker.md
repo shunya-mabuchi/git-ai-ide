@@ -495,3 +495,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で Demo workspace が Recorded fallback として表示されることを確認
   - PR は GitHub issue #31 に `Closes #31` で紐づける
   - PR #32 を作成済み
+
+## GAI-022: GitHub PR Flow の readiness を可視化する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/33
+- 背景: GitHub Integration は push と PR 作成を実行できるが、選択 repo、branch、installation、push、PR URL の状態が散らばっている。PR helper mini app として、PR 作成前後の E2E readiness を一箇所で説明できる UI が必要。
+- スコープ:
+  - shared に PR flow readiness の判定関数とテストを追加する
+  - GitHub Integration に repository / branch / installation / pushed commit / PR created の checklist を表示する
+  - demo mode と GitHub App mode の違いを明示する
+  - 既存 Safety Gate と矛盾しないようにする
+- 受け入れ条件:
+  - PR helper の readiness が UI で読める
+  - Demo mode と GitHub mode の状態差が表示される
+  - branch 未 push のとき PR 作成待ちになる
+  - shared test / typecheck / web build が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/shared test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で GitHub Integration に Demo mode / Repository target / Branch / Branch push / Pull request の checklist が表示されることを確認
+  - browser で branch 未 push のとき PR 作成待ちとして表示されることを確認
+  - PR は GitHub issue #33 に `Closes #33` で紐づける
+  - PR #34 を作成済み
