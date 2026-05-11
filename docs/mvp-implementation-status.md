@@ -70,7 +70,7 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 
 これらは UI と型境界を先に実装してあり、次に実 API / runtime を差し替える想定です。
 
-## 面接で説明するポイント
+## 設計上のポイント
 
 - AI の出力を直接適用せず、structured edit と diff review に分けたこと
 - 小さなブラウザ LLM の制約を前提に、task priority と runtime fallback を設計したこと

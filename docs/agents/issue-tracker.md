@@ -152,7 +152,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - ラベル: `実装可能`, `種別:ドキュメント`, `領域:docs`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/4
-- 背景: ユーザーが読む Markdown に英語の見出し・説明が残っており、ポートフォリオとして確認するときの理解コストが高い。
+- 背景: ユーザーが読む Markdown に英語の見出し・説明が残っており、公開ドキュメントとして確認するときの理解コストが高い。
 - スコープ:
   - `AGENTS.md` を日本語化する
   - `README.md` を日本語化する
@@ -425,7 +425,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/27
-- 背景: PR 作成前チェックはあるが、Local Preview と branch push が Safety Gate 本体に統合されていない。AI workflow safety を面接で説明しやすくするため、Diff Review / Tests / Local Preview / Commit / Push / PR draft を同じ gate で扱う必要がある。
+- 背景: PR 作成前チェックはあるが、Local Preview と branch push が Safety Gate 本体に統合されていない。AI workflow safety を UI 上で説明しやすくするため、Diff Review / Tests / Local Preview / Commit / Push / PR draft を同じ gate で扱う必要がある。
 - スコープ:
   - SafetyGateInput に previewChecked / branchPushed を追加する
   - evaluateSafetyGate に Local Preview と Branch pushed を追加する
@@ -451,7 +451,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `領域:web`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/29
-- 背景: Ollama API から Patch Proposal を生成する経路は実装済みだが、UI 上で実 E2E と fallback のどちらが動いたかを確認しづらい。面接で「ブラウザ IDE がローカル LLM と相談し、安全に structured edit を受け取る」価値を説明するため、診断ログを明示する必要がある。
+- 背景: Ollama API から Patch Proposal を生成する経路は実装済みだが、UI 上で実 E2E と fallback のどちらが動いたかを確認しづらい。ブラウザ IDE がローカル LLM と相談し、安全に structured edit を受け取る価値を説明するため、診断ログを明示する必要がある。
 - スコープ:
   - Model Routing に Ollama E2E 診断ボタンを追加する
   - 現在のファイルと Branch Goal を使って `requestPatchProposal` を実行する
@@ -522,22 +522,22 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - PR は GitHub issue #33 に `Closes #33` で紐づける
   - PR #34 を作成済み
 
-## GAI-023: ポートフォリオ向け README とデプロイ資料を整える
+## GAI-023: 公開向け README とデプロイ資料を整える
 
 - 状態: 完了
 - ラベル: `実装可能`, `種別:ドキュメント`, `領域:docs`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/35
-- 背景: 主要機能の実装が進んだため、README、面接資料、無料公開のデプロイ手順を現在の実装に合わせて更新する。転職ポートフォリオとして、技術選定・代替案・制約・デモ手順を日本語で説明できる状態にする。
+- 背景: 主要機能の実装が進んだため、README と無料公開のデプロイ手順を現在の実装に合わせて更新する。公開ドキュメントとして、技術選定・代替案・制約・デモ手順を日本語で説明できる状態にする。
 - スコープ:
   - README に現在の価値、機能、デモ手順、検証コマンド、ドキュメント導線を整理する
   - Cloudflare Pages / Workers / D1 の無料枠前提デプロイ手順を追加する
-  - 面接資料に現在の完成度、アピールポイント、残リスクを追記する
+  - 現在の完成度、設計上の特徴、残リスクを追記する
   - completion roadmap を完了状態に合わせて更新する
 - 受け入れ条件:
   - README だけでプロダクト概要とローカル起動が分かる
   - デプロイ手順が Cloudflare 前提で読める
-  - 面接で説明する技術選定と制約が日本語で読める
+  - 技術選定と制約が日本語で読める
   - typecheck / web build が通る
 - 検証:
   - `pnpm -r typecheck` 成功
@@ -580,7 +580,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - スコープ:
   - Explorer に file create / rename / delete の UI を追加する
   - Source Control に branch list / commit history / merge readiness を追加する
-  - conflict demo と解消方針を表示し、面接で説明できる workflow safety に接続する
+  - conflict demo と解消方針を表示し、UI 上で説明できる workflow safety に接続する
   - 変更後に typecheck / build / browser smoke を実行する
 - 受け入れ条件:
   - Demo repo で新規ファイル作成、改名、削除が UI 上で変更として見える
