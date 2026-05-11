@@ -1,40 +1,40 @@
-# Triage Labels
+# トリアージラベル
 
-Use these labels for local issues in `docs/agents/issue-tracker.md`.
+`docs/agents/issue-tracker.md` と GitHub Issues で使うラベルです。
 
-## Status
+## 状態
 
-- `needs-triage`: issue has not been reviewed yet
-- `needs-info`: blocked by missing product or technical information
-- `ready-for-agent`: scoped enough for Codex implementation
-- `ready-for-human`: needs user/product decision
-- `in-progress`: actively being implemented
-- `done`: completed and verified
-- `wontfix`: intentionally not planned
+- `要整理`: まだ内容を確認していない
+- `情報不足`: 仕様や判断材料が足りない
+- `実装可能`: Codex が実装できる粒度まで整理済み
+- `人間判断待ち`: ユーザーやプロダクト判断が必要
+- `作業中`: 実装中
+- `完了`: 実装と検証が完了
+- `対応しない`: 意図的に対応しない
 
-## Type
+## 種別
 
-- `type:feature`
-- `type:bug`
-- `type:docs`
-- `type:refactor`
-- `type:infra`
-- `type:security`
+- `種別:機能`
+- `種別:バグ`
+- `種別:ドキュメント`
+- `種別:リファクタ`
+- `種別:基盤`
+- `種別:セキュリティ`
 
-## Area
+## 領域
 
-- `area:web`
-- `area:worker`
-- `area:github`
-- `area:ai-runtime`
-- `area:git`
-- `area:runtime`
-- `area:docs`
-- `area:workflow-safety`
+- `領域:web`
+- `領域:worker`
+- `領域:github`
+- `領域:ai-runtime`
+- `領域:git`
+- `領域:runtime`
+- `領域:docs`
+- `領域:workflow-safety`
 
-## Priority
+## 優先度
 
-- `p0`: blocks demo or core workflow
-- `p1`: important for MVP credibility
-- `p2`: useful polish or follow-up
-- `p3`: later
+- `優先度:p0`: デモや中核 workflow を止める
+- `優先度:p1`: MVP の説得力に重要
+- `優先度:p2`: 有用な改善
+- `優先度:p3`: 後でよい

@@ -196,6 +196,67 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/github/push-files" && request.method === "POST") {
+      const body = (await request.json().catch(() => null)) as
+        | {
+            baseBranch?: string;
+            branch?: string;
+            changes?: Array<{
+              content?: string;
+              path: string;
+              status: "added" | "deleted" | "modified";
+            }>;
+            commitMessage?: string;
+            installationId?: number;
+            repository?: string;
+          }
+        | null;
+
+      if (!body?.repository || !body.branch || !body.commitMessage || !body.changes?.length) {
+        return json({ error: "repository, branch, commitMessage, changes are required" }, { status: 400 });
+      }
+
+      if (!isGitHubConfigured(env) || body.repository.startsWith("demo/")) {
+        return json({
+          commit: {
+            branch: body.branch,
+            changedFiles: body.changes.length,
+            sha: `demo-${crypto.randomUUID()}`,
+          },
+          mode: "demo",
+        });
+      }
+
+      if (!body.installationId) {
+        return json({ error: "installationId is required for GitHub mode" }, { status: 400 });
+      }
+
+      const token = await createInstallationToken(env, body.installationId);
+      const branch = body.branch;
+      const baseBranch = body.baseBranch ?? "main";
+      await ensureBranch(token, body.repository, baseBranch, branch);
+
+      const commitShas: string[] = [];
+      for (const change of body.changes) {
+        const result = await writeContentChange(token, {
+          branch,
+          change,
+          commitMessage: body.commitMessage,
+          repository: body.repository,
+        });
+        if (result?.commit?.sha) commitShas.push(result.commit.sha);
+      }
+
+      return json({
+        commit: {
+          branch,
+          changedFiles: body.changes.length,
+          sha: commitShas.at(-1),
+        },
+        mode: "github",
+      });
+    }
+
     return json({ error: "Not found" }, { status: 404 });
   },
 };
@@ -308,6 +369,119 @@ async function createInstallationToken(env: Env, installationId: number) {
 
   const body = (await response.json()) as { token: string };
   return body.token;
+}
+
+async function ensureBranch(token: string, repository: string, baseBranch: string, branch: string) {
+  const existing = await fetch(`https://api.github.com/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`, {
+    headers: githubHeaders(token),
+  });
+
+  if (existing.ok) return;
+  if (existing.status !== 404) {
+    throw new Error(`Failed to inspect branch: ${existing.status}`);
+  }
+
+  const baseRef = await fetch(
+    `https://api.github.com/repos/${repository}/git/ref/heads/${encodeURIComponent(baseBranch)}`,
+    {
+      headers: githubHeaders(token),
+    },
+  );
+
+  if (!baseRef.ok) {
+    throw new Error(`Failed to load base branch: ${baseRef.status}`);
+  }
+
+  const baseRefBody = (await baseRef.json()) as { object: { sha: string } };
+  const created = await fetch(`https://api.github.com/repos/${repository}/git/refs`, {
+    body: JSON.stringify({
+      ref: `refs/heads/${branch}`,
+      sha: baseRefBody.object.sha,
+    }),
+    headers: githubHeaders(token),
+    method: "POST",
+  });
+
+  if (!created.ok) {
+    throw new Error(`Failed to create branch: ${created.status}`);
+  }
+}
+
+async function writeContentChange(
+  token: string,
+  input: {
+    branch: string;
+    change: {
+      content?: string;
+      path: string;
+      status: "added" | "deleted" | "modified";
+    };
+    commitMessage: string;
+    repository: string;
+  },
+) {
+  const currentFile = await fetch(
+    `https://api.github.com/repos/${input.repository}/contents/${encodePath(input.change.path)}?ref=${encodeURIComponent(input.branch)}`,
+    {
+      headers: githubHeaders(token),
+    },
+  );
+  const currentFileBody = currentFile.ok ? ((await currentFile.json()) as { sha: string }) : undefined;
+
+  if (input.change.status === "deleted") {
+    if (!currentFileBody?.sha) return undefined;
+    const deleted = await fetch(
+      `https://api.github.com/repos/${input.repository}/contents/${encodePath(input.change.path)}`,
+      {
+        body: JSON.stringify({
+          branch: input.branch,
+          message: input.commitMessage,
+          sha: currentFileBody.sha,
+        }),
+        headers: githubHeaders(token),
+        method: "DELETE",
+      },
+    );
+
+    if (!deleted.ok) {
+      throw new Error(`Failed to delete ${input.change.path}: ${deleted.status}`);
+    }
+
+    return deleted.json() as Promise<{ commit?: { sha: string } }>;
+  }
+
+  const written = await fetch(
+    `https://api.github.com/repos/${input.repository}/contents/${encodePath(input.change.path)}`,
+    {
+      body: JSON.stringify({
+        branch: input.branch,
+        content: base64Encode(input.change.content ?? ""),
+        message: input.commitMessage,
+        sha: currentFileBody?.sha,
+      }),
+      headers: githubHeaders(token),
+      method: "PUT",
+    },
+  );
+
+  if (!written.ok) {
+    throw new Error(`Failed to write ${input.change.path}: ${written.status}`);
+  }
+
+  return written.json() as Promise<{ commit?: { sha: string } }>;
+}
+
+function encodePath(path: string) {
+  return path.split("/").map(encodeURIComponent).join("/");
+}
+
+function base64Encode(text: string) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
 }
 
 function githubHeaders(token: string) {

@@ -24,6 +24,7 @@ import {
   createGitHubPullRequest,
   loadGitHubRepositories,
   loadGitHubSetup,
+  pushGitHubFiles,
   type GitHubRepositoryOption,
 } from "./github/githubClient";
 import {
@@ -84,12 +85,14 @@ export function App() {
   const [commitCreated, setCommitCreated] = useState(false);
   const [branchPushed, setBranchPushed] = useState(false);
   const [createdPrUrl, setCreatedPrUrl] = useState("");
+  const [pushedCommitSha, setPushedCommitSha] = useState("");
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [githubInstallUrl, setGithubInstallUrl] = useState("");
   const [githubRepositories, setGithubRepositories] = useState<GitHubRepositoryOption[]>([]);
   const [selectedRepository, setSelectedRepository] = useState("demo/pr-helper-mini");
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
+  const [isPushingBranch, setIsPushingBranch] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
@@ -291,16 +294,45 @@ export function App() {
     setBottomPanelMode("terminal");
   };
 
-  const pushBranch = () => {
+  const pushBranch = async () => {
     if (!commitCreated) {
       setBottomPanelMode("problems");
       setBottomPanelCollapsed(false);
       return;
     }
 
-    setBranchPushed(true);
-    setBottomPanelMode("output");
-    setBottomPanelCollapsed(false);
+    setIsPushingBranch(true);
+
+    try {
+      const result = await pushGitHubFiles({
+        baseBranch: "main",
+        branch: branchName,
+        changes: gitStatus.entries.map((entry) => {
+          const status = entry.status as "added" | "deleted" | "modified";
+
+          return {
+            content: status === "deleted" ? undefined : files[entry.file],
+            path: entry.file,
+            status,
+          };
+        }),
+        commitMessage,
+        installationId: selectedInstallationId,
+        repository: selectedRepository,
+      });
+      setBranchPushed(true);
+      setPushedCommitSha(result.commit.sha ?? "");
+      setGithubStatusMessage(result.mode === "github" ? "Branch pushed to GitHub" : "Demo branch pushed");
+      setBottomPanelMode("output");
+      setBottomPanelCollapsed(false);
+    } catch (error) {
+      setBranchPushed(false);
+      setGithubStatusMessage(error instanceof Error ? `Push failed: ${error.message}` : "Push failed");
+      setBottomPanelMode("problems");
+      setBottomPanelCollapsed(false);
+    } finally {
+      setIsPushingBranch(false);
+    }
   };
 
   const openLocalWorkspace = async () => {
@@ -322,6 +354,7 @@ export function App() {
       setCommitMessage("");
       setCommitCreated(false);
       setBranchPushed(false);
+      setPushedCommitSha("");
       setCreatedPrUrl("");
       setWorkspaceRestored(false);
     } catch (error) {
@@ -346,6 +379,7 @@ export function App() {
     setCommitMessage("");
     setCommitCreated(false);
     setBranchPushed(false);
+    setPushedCommitSha("");
     setCreatedPrUrl("");
     setWorkspaceError(null);
     setWorkspaceRestored(false);
@@ -360,6 +394,7 @@ export function App() {
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
+    setPushedCommitSha("");
     setCreatedPrUrl("");
   };
 
@@ -386,6 +421,7 @@ export function App() {
     setCommitMessage(nextMessage);
     setCommitCreated(true);
     setBranchPushed(false);
+    setPushedCommitSha("");
     setCreatedPrUrl("");
     setBaselineFiles(files);
     setPatchApplied(false);
@@ -639,8 +675,8 @@ export function App() {
                     <button className="button secondary" disabled={!gitStatus.hasChanges} onClick={createCommitDraft}>
                       Commit draft
                     </button>
-                    <button className="button secondary" disabled={!commitCreated || branchPushed} onClick={pushBranch}>
-                      Push
+                    <button className="button secondary" disabled={!commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
+                      {isPushingBranch ? "Pushing" : "Push"}
                     </button>
                     <button className="button" disabled={!safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
                       {isCreatingPr ? "作成中" : "PR 作成"}
@@ -669,6 +705,7 @@ export function App() {
                     <span>{githubStatusMessage}</span>
                     {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : null}
                     <span>{branchPushed ? "branch pushed" : "push pending"}</span>
+                    {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}
                   </div>
                   {commitCreated ? (
@@ -804,7 +841,7 @@ export function App() {
                 ) : createdPrUrl ? (
                   <pre className="terminal-view">{`Pull request created\n\n${createdPrUrl}`}</pre>
                 ) : branchPushed ? (
-                  <pre className="terminal-view">{`Branch pushed\n\n${branchName} -> origin/${branchName}\nReady to create pull request.`}</pre>
+                  <pre className="terminal-view">{`Branch pushed\n\n${branchName} -> origin/${branchName}\n${pushedCommitSha ? `commit: ${pushedCommitSha}\n` : ""}Ready to create pull request.`}</pre>
                 ) : commitCreated ? (
                   <pre className="terminal-view">{`Commit draft created\n\n${commitMessage}`}</pre>
                 ) : (

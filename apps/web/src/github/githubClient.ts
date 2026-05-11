@@ -21,6 +21,28 @@ export type CreatePullRequestInput = {
   title: string;
 };
 
+export type PushFilesInput = {
+  baseBranch: string;
+  branch: string;
+  changes: Array<{
+    content?: string;
+    path: string;
+    status: "added" | "deleted" | "modified";
+  }>;
+  commitMessage: string;
+  installationId?: number;
+  repository: string;
+};
+
+export type PushFilesResult = {
+  commit: {
+    branch: string;
+    changedFiles: number;
+    sha?: string;
+  };
+  mode: "demo" | "github";
+};
+
 export type CreatePullRequestResult = {
   mode: "demo" | "github";
   pullRequest: {
@@ -59,6 +81,23 @@ export async function createGitHubPullRequest(input: CreatePullRequestInput): Pr
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.error ?? "Pull request を作成できませんでした。");
+  }
+
+  return response.json();
+}
+
+export async function pushGitHubFiles(input: PushFilesInput): Promise<PushFilesResult> {
+  const response = await fetch(`${workerBaseUrl}/api/github/push-files`, {
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.error ?? "Branch に変更を push できませんでした。");
   }
 
   return response.json();
