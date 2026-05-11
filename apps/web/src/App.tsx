@@ -44,7 +44,7 @@ import { runRuntimeChecks } from "./runtime/webContainerRuntime";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
-type BottomPanelMode = "problems" | "terminal" | "output";
+type BottomPanelMode = "problems" | "terminal" | "preview" | "output";
 type DiffMode = "patch" | "file";
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
@@ -110,6 +110,8 @@ export function App() {
   const [testsRun, setTestsRun] = useState(false);
   const [runtimeRunState, setRuntimeRunState] = useState<"idle" | "running">("idle");
   const [runtimeLog, setRuntimeLog] = useState(demoTestLogIdle);
+  const [previewRunState, setPreviewRunState] = useState<"idle" | "running" | "ready">("idle");
+  const [previewLog, setPreviewLog] = useState("Local Preview はまだ起動していません。");
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [branchName, setBranchName] = useState("feature/pr-summary");
@@ -333,6 +335,8 @@ export function App() {
     : patchApplied
       ? "Patch 適用済み / Tests 未実行"
       : "Patch review が必要";
+  const previewCommand = runtimePlan.devCommand ?? runtimePlan.previewCommand;
+  const previewAvailable = Boolean(previewCommand);
 
   const openDiffPreview = () => {
     if (!patchTargetAvailable) {
@@ -437,6 +441,22 @@ export function App() {
     setRuntimeRunState("idle");
   };
 
+  const runLocalPreview = () => {
+    setPreviewRunState("running");
+    setBottomPanelMode("preview");
+    setBottomPanelCollapsed(false);
+
+    const log = createLocalPreviewLog({
+      plan: runtimePlan,
+      workspaceName,
+    });
+
+    window.setTimeout(() => {
+      setPreviewLog(log);
+      setPreviewRunState("ready");
+    }, 300);
+  };
+
   const pushBranch = async () => {
     if (!commitCreated) {
       setBottomPanelMode("problems");
@@ -496,6 +516,8 @@ export function App() {
       setPatchApplied(false);
       setTestsRun(false);
       setRuntimeLog(demoTestLogIdle);
+      setPreviewRunState("idle");
+      setPreviewLog("Local Preview はまだ起動していません。");
       setPrDraftGenerated(false);
       setCommitMessage("");
       setCommitCreated(false);
@@ -522,6 +544,8 @@ export function App() {
     setPatchApplied(false);
     setTestsRun(false);
     setRuntimeLog(demoTestLogIdle);
+    setPreviewRunState("idle");
+    setPreviewLog("Local Preview はまだ起動していません。");
     setPrDraftGenerated(false);
     setBranchName("feature/pr-summary");
     setCommitMessage("");
@@ -1032,6 +1056,12 @@ export function App() {
                 ターミナル
               </button>
               <button
+                className={bottomPanelMode === "preview" ? "bottom-tab active" : "bottom-tab"}
+                onClick={() => setBottomPanelMode("preview")}
+              >
+                Preview
+              </button>
+              <button
                 className={bottomPanelMode === "output" ? "bottom-tab active" : "bottom-tab"}
                 onClick={() => setBottomPanelMode("output")}
               >
@@ -1039,6 +1069,9 @@ export function App() {
               </button>
               <button className="button secondary run-tests" disabled={!patchApplied || testsRun || runtimeRunState === "running"} onClick={runWorkspaceChecks}>
                 <Play size={15} /> {runtimeRunState === "running" ? "実行中" : "Runtime checks"}
+              </button>
+              <button className="button secondary run-tests" disabled={!previewAvailable || previewRunState === "running"} onClick={runLocalPreview}>
+                <Play size={15} /> {previewRunState === "running" ? "起動中" : "Local Preview"}
               </button>
               <button className="button ghost collapse-bottom" onClick={() => setBottomPanelCollapsed((collapsed) => !collapsed)}>
                 {bottomPanelCollapsed ? "開く" : "閉じる"}
@@ -1062,6 +1095,25 @@ export function App() {
               ) : null}
               {bottomPanelMode === "terminal" ? (
                 <pre className="terminal-view">{runtimeLog}</pre>
+              ) : null}
+              {bottomPanelMode === "preview" ? (
+                <div className="preview-panel">
+                  <div className="preview-info">
+                    <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
+                    <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
+                    <span>mode: {canUsePreviewFrame(runtimePlan.capability) ? "WebContainer candidate" : "Recorded fallback"}</span>
+                  </div>
+                  <div className="preview-frame">
+                    <strong>{workspaceName}</strong>
+                    <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
+                    <p>
+                      {previewAvailable
+                        ? "この領域に dev server の画面を表示する想定です。現在は安全な recorded preview として、起動コマンド・制約・次アクションを確認できます。"
+                        : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
+                    </p>
+                  </div>
+                  <pre className="preview-log">{previewLog}</pre>
+                </div>
               ) : null}
               {bottomPanelMode === "output" ? (
                 prDraftGenerated ? (
@@ -1164,6 +1216,8 @@ export function App() {
                   <span>confidence: {runtimePlan.confidence}</span>
                   <span>test: {runtimePlan.testCommand ?? "not detected"}</span>
                   <span>typecheck: {runtimePlan.typecheckCommand ?? "not detected"}</span>
+                  <span>dev: {runtimePlan.devCommand ?? "not detected"}</span>
+                  <span>preview: {runtimePlan.previewCommand ?? "not detected"}</span>
                 </div>
               </section>
 
@@ -1431,6 +1485,39 @@ function searchWorkspace(files: Record<string, string>, query: string): SearchRe
   }
 
   return results;
+}
+
+function canUsePreviewFrame(capability: string) {
+  return capability === "webcontainer";
+}
+
+function createLocalPreviewLog({ plan, workspaceName }: { plan: ReturnType<typeof planRuntimeFromPackageJson>; workspaceName: string }) {
+  const previewCommand = plan.devCommand ?? plan.previewCommand;
+
+  if (!previewCommand) {
+    return [
+      "Git AI IDE Local Preview",
+      "mode: Recorded fallback",
+      `${workspaceName} では dev / preview script を検出できませんでした。`,
+      "",
+      "次の確認:",
+      "- package.json に dev script があるか確認",
+      "- build / test command がある場合は Runtime checks を実行",
+    ].join("\n");
+  }
+
+  return [
+    "Git AI IDE Local Preview",
+    "mode: Recorded fallback",
+    "",
+    `workspace: ${workspaceName}`,
+    `install: ${plan.installCommand ?? "not detected"}`,
+    `preview: ${previewCommand}`,
+    plan.buildCommand ? `build: ${plan.buildCommand}` : "build: not detected",
+    "",
+    "Preview ready.",
+    "WebContainer dev server iframe 接続は次の縦割りで実装します。",
+  ].join("\n");
 }
 
 function clamp(value: number, min: number, max: number) {

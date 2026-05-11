@@ -75,7 +75,10 @@ export type RuntimeCapability = "webcontainer" | "local_command" | "recorded";
 
 export type RuntimePlan = {
   capability: RuntimeCapability;
+  buildCommand?: string;
+  devCommand?: string;
   installCommand?: string;
+  previewCommand?: string;
   testCommand?: string;
   typecheckCommand?: string;
   confidence: "high" | "medium" | "low";
