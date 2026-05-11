@@ -315,3 +315,30 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で demo workspace の Local Preview recorded fallback を確認
   - PR は GitHub issue #17 に `Closes #17` で紐づける
   - PR #18 を merge 済み
+
+## GAI-015: Branch Goal から Patch Proposal を生成できるようにする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/19
+- 背景: Patch Queue はまだ demoPatch 固定で、AI と相談して変更案を作るありがたみが弱い。Branch Goal、現在のファイル、選択 runtime mode を使って structured edit proposal を生成し、diff review に流せる必要がある。
+- スコープ:
+  - ai-runtime に recorded patch proposal generator を追加する
+  - App 側の Patch Queue を demo 固定から active proposal state に変更する
+  - AI Assistant から patch proposal を生成できるボタンを追加する
+  - 生成した patch を diff preview / apply flow に接続する
+  - 失敗時は日本語の fallback message を表示する
+- 受け入れ条件:
+  - Branch Goal と現在ファイルから Patch Proposal を生成できる
+  - Patch Queue が生成済み proposal を表示する
+  - Diff preview と Patch 適用が生成 proposal を使う
+  - demo repo で browser 確認できる
+  - typecheck / build / ai-runtime test が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で AI patch 生成と Diff preview 表示を確認
+  - PR は GitHub issue #19 に `Closes #19` で紐づける
+  - PR #20 を merge 済み

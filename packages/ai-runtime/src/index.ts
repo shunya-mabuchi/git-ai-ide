@@ -1,4 +1,4 @@
-import type { AiTask, ContextPack, ModelCapability, RuntimePlan } from "@git-ai-ide/shared";
+import type { AiTask, ContextPack, ModelCapability, PatchProposal, RuntimePlan } from "@git-ai-ide/shared";
 
 export type AiRuntimeStatus = {
   webGpuAvailable: boolean;
@@ -33,6 +33,29 @@ export type AiTaskResult = {
   summary: string;
   warnings: string[];
 };
+
+export type PatchProposalRequest = {
+  branchGoalMarkdown: string;
+  currentFile: {
+    content: string;
+    path: string;
+  };
+  mode: AiExecutionMode;
+};
+
+export type PatchProposalResult =
+  | {
+      ok: true;
+      mode: AiExecutionMode;
+      proposal: PatchProposal;
+      warnings: string[];
+    }
+  | {
+      ok: false;
+      mode: AiExecutionMode;
+      error: string;
+      warnings: string[];
+    };
 
 export const recordedDemoModel: ModelCapability = {
   provider: "recorded",
@@ -270,6 +293,109 @@ export function runRecordedTask(request: AiTaskRequest): AiTaskResult {
   };
 }
 
+export function generatePatchProposal(request: PatchProposalRequest): PatchProposalResult {
+  const branchGoalTitle = extractMarkdownTitle(request.branchGoalMarkdown) || "Branch Goal";
+  const content = request.currentFile.content;
+
+  if (!content.trim()) {
+    return {
+      error: "現在のファイルが空のため、structured edit を生成できません。",
+      mode: request.mode,
+      ok: false,
+      warnings: ["別のファイルを開くか、ファイルに内容を追加してから再実行してください。"],
+    };
+  }
+
+  if (content.includes("export function generateSummary(diff: string)") && !content.includes("Diff input is required")) {
+    const find = `export function generateSummary(diff: string) {
+  const changedFiles = extractChangedFiles(diff);`;
+    const replacement = `export function generateSummary(diff: string) {
+  if (!diff.trim()) {
+    throw new Error("Diff input is required");
+  }
+
+  const changedFiles = extractChangedFiles(diff);`;
+
+    return {
+      mode: request.mode,
+      ok: true,
+      proposal: {
+        id: `ai-patch-${Date.now()}`,
+        title: "空の diff 入力を扱う",
+        summary: `${branchGoalTitle} に沿って、PR summary generator が空入力を明示的に拒否するようにします。`,
+        status: "ready",
+        safety: {
+          branchGoalAttached: Boolean(request.branchGoalMarkdown.trim()),
+          contextPackReviewed: true,
+          diffPreviewGenerated: true,
+          gitDiffUpdated: false,
+          modelCapabilityAccepted: request.mode !== "webllm",
+          structuredEditParsed: true,
+          targetFileExists: true,
+          targetTextMatched: true,
+          testsRun: false,
+        },
+        edits: [
+          {
+            file: request.currentFile.path,
+            find,
+            operation: "replace",
+            reason: "空の diff から誤解を招く PR summary が生成されるのを防ぐため。",
+            replacement,
+          },
+        ],
+      },
+      warnings:
+        request.mode === "webllm"
+          ? ["WebLLM は小さなモデル想定のため、適用前に diff review を必ず確認してください。"]
+          : [],
+    };
+  }
+
+  const firstMeaningfulLine = content.split(/\r?\n/).find((line) => line.trim());
+
+  if (!firstMeaningfulLine) {
+    return {
+      error: "編集対象にできる行が見つかりませんでした。",
+      mode: request.mode,
+      ok: false,
+      warnings: ["空白だけのファイルは patch proposal の対象外です。"],
+    };
+  }
+
+  return {
+    mode: request.mode,
+    ok: true,
+    proposal: {
+      id: `ai-patch-${Date.now()}`,
+      title: "Branch Goal メモを追加する",
+      summary: "現在のファイルに Branch Goal を意識した確認コメントを追加します。小さく安全に diff review できる fallback proposal です。",
+      status: "ready",
+      safety: {
+        branchGoalAttached: Boolean(request.branchGoalMarkdown.trim()),
+        contextPackReviewed: true,
+        diffPreviewGenerated: true,
+        gitDiffUpdated: false,
+        modelCapabilityAccepted: request.mode !== "webllm",
+        structuredEditParsed: true,
+        targetFileExists: true,
+        targetTextMatched: true,
+        testsRun: false,
+      },
+      edits: [
+        {
+          file: request.currentFile.path,
+          find: firstMeaningfulLine,
+          operation: "replace",
+          reason: "Branch Goal を現在のファイルに紐づけ、後続の AI review で意図を追いやすくするため。",
+          replacement: `${firstMeaningfulLine}\n// TODO: ${branchGoalTitle} に沿ってこの変更の影響を確認する。`,
+        },
+      ],
+    },
+    warnings: ["汎用 fallback proposal です。実装意図に合うか diff review で確認してください。"],
+  };
+}
+
 export function planRuntimeFromPackageJson(files: Record<string, string>): RuntimePlan {
   const packageJson = files["package.json"];
 
@@ -313,4 +439,12 @@ function detectPackageManager(files: Record<string, string>) {
   if (files["pnpm-lock.yaml"]) return "pnpm";
   if (files["yarn.lock"]) return "yarn";
   return "npm";
+}
+
+function extractMarkdownTitle(markdown: string) {
+  return markdown
+    .split("\n")
+    .find((line) => line.startsWith("# "))
+    ?.replace(/^# /, "")
+    .trim();
 }
