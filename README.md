@@ -113,9 +113,6 @@ pnpm --filter @git-ai-ide/web test:e2e
 
 ## ドキュメント
 
-- [PRD / Architecture / MVP Milestones](git-ai-ide_prd_architecture_milestones.md)
-- [技術選定メモ](git-ai-ide_technical_decisions.md)
-- [面接用アピール資料](git-ai-ide_interview_notes.md)
 - [デプロイ手順](docs/deployment.md)
 - [開発環境](docs/development.md)
 - [MVP 実装状況](docs/mvp-implementation-status.md)
