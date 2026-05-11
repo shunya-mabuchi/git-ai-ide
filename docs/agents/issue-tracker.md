@@ -521,3 +521,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で branch 未 push のとき PR 作成待ちとして表示されることを確認
   - PR は GitHub issue #33 に `Closes #33` で紐づける
   - PR #34 を作成済み
+
+## GAI-023: ポートフォリオ向け README とデプロイ資料を整える
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:ドキュメント`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/35
+- 背景: 主要機能の実装が進んだため、README、面接資料、無料公開のデプロイ手順を現在の実装に合わせて更新する。転職ポートフォリオとして、技術選定・代替案・制約・デモ手順を日本語で説明できる状態にする。
+- スコープ:
+  - README に現在の価値、機能、デモ手順、検証コマンド、ドキュメント導線を整理する
+  - Cloudflare Pages / Workers / D1 の無料枠前提デプロイ手順を追加する
+  - 面接資料に現在の完成度、アピールポイント、残リスクを追記する
+  - completion roadmap を完了状態に合わせて更新する
+- 受け入れ条件:
+  - README だけでプロダクト概要とローカル起動が分かる
+  - デプロイ手順が Cloudflare 前提で読める
+  - 面接で説明する技術選定と制約が日本語で読める
+  - typecheck / web build が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - README の主要ドキュメントリンクが存在することを確認
+  - PR は GitHub issue #35 に `Closes #35` で紐づける
+  - PR #36 を作成済み

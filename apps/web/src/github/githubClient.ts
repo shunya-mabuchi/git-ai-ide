@@ -57,7 +57,8 @@ export type CreatePullRequestResult = {
   sessionId: string;
 };
 
-const workerBaseUrl = import.meta.env.VITE_LOCALFORGE_WORKER_URL ?? "http://127.0.0.1:8787";
+const workerBaseUrl =
+  import.meta.env.VITE_GIT_AI_IDE_WORKER_URL ?? import.meta.env.VITE_LOCALFORGE_WORKER_URL ?? "http://127.0.0.1:8787";
 
 export async function loadGitHubSetup(): Promise<GitHubSetupStatus> {
   const response = await fetch(`${workerBaseUrl}/api/github/setup`);
