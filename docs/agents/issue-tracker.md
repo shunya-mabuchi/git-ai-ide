@@ -545,3 +545,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - README の主要ドキュメントリンクが存在することを確認
   - PR は GitHub issue #35 に `Closes #35` で紐づける
   - PR #36 を作成済み
+
+## GAI-024: 実 runtime E2E 診断ハブを追加する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:ai-runtime`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/37
+- 背景: GitHub App、WebLLM、Ollama、WebContainer は境界実装と fallback はあるが、実 credentials / 実 runtime で何が確認済みかを UI で一括把握しづらい。
+- スコープ:
+  - GitHub App 実接続 readiness / selected repo / push / PR / issue close の診断項目を表示する
+  - WebLLM model loading / WebGPU / cache readiness を表示する
+  - Ollama model 選択と実 request 結果を表示する
+  - WebContainer preview preflight / iframe readiness を表示する
+  - 診断結果を docs と issue tracker に残す
+- 受け入れ条件:
+  - UI で runtime E2E の未確認/確認済み/blocked が分かる
+  - WebLLM/Ollama/WebContainer/GitHub が同じ粒度の checklist で見える
+  - typecheck / build / browser smoke が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で E2E Diagnostics に GitHub App / WebLLM / Ollama / WebContainer の checklist が表示されることを確認
+  - PR は GitHub issue #37 に `Closes #37` で紐づける
+  - PR #41 を作成済み

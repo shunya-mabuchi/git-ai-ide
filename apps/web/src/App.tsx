@@ -64,6 +64,14 @@ type ExplorerNode = {
   type: "directory" | "file";
 };
 
+type RuntimeDiagnosticItem = {
+  detail: string;
+  group: "github" | "webllm" | "ollama" | "webcontainer";
+  id: string;
+  label: string;
+  status: "pass" | "warning" | "blocked";
+};
+
 const aiMessages = [
   {
     title: "差分の説明",
@@ -365,6 +373,105 @@ export function App() {
       }),
     [branchName, branchPushed, createdPrUrl, githubConfigured, safetyGate.canCreatePullRequest, selectedInstallationId, selectedRepository],
   );
+  const runtimeDiagnostics = useMemo<RuntimeDiagnosticItem[]>(() => {
+    const webllmHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "webllm");
+    const ollamaHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "ollama");
+    const githubModeReady = githubConfigured ? Boolean(selectedInstallationId) : true;
+    const webContainerBlocked = previewPreflight.items.find((item) => item.status === "blocked");
+    const webContainerWarning = previewPreflight.items.find((item) => item.status === "warning");
+
+    return [
+      {
+        detail: githubConfigured
+          ? selectedInstallationId
+            ? `${selectedRepository} の installation を選択済みです。`
+            : "GitHub App mode では installation 選択が必要です。"
+          : "GitHub secrets 未設定のため demo mode で確認します。",
+        group: "github",
+        id: "github-credentials",
+        label: "GitHub App credentials",
+        status: githubModeReady ? "pass" : "blocked",
+      },
+      {
+        detail: branchPushed
+          ? `branch push 済み${pushedCommitSha ? `: ${pushedCommitSha.slice(0, 12)}` : ""}`
+          : "実 PR 作成前に branch push を確認します。",
+        group: "github",
+        id: "github-branch-push",
+        label: "Branch push E2E",
+        status: branchPushed ? "pass" : "warning",
+      },
+      {
+        detail: createdPrUrl || "PR 作成後に URL と issue close keyword を確認します。",
+        group: "github",
+        id: "github-pr",
+        label: "PR creation / issue close",
+        status: createdPrUrl ? "pass" : "warning",
+      },
+      {
+        detail: webllmHealth?.detail ?? "WebLLM runtime をまだ確認していません。",
+        group: "webllm",
+        id: "webllm-webgpu",
+        label: "WebGPU / WebLLM readiness",
+        status: webllmHealth?.status === "available" ? "pass" : "blocked",
+      },
+      {
+        detail:
+          webllmHealth?.status === "available"
+            ? "model loading boundary と cache UX の確認対象です。"
+            : "WebGPU 対応端末で model loading を確認します。",
+        group: "webllm",
+        id: "webllm-model-load",
+        label: "Model loading / cache",
+        status: webllmHealth?.status === "available" ? "warning" : "blocked",
+      },
+      {
+        detail: ollamaHealth?.detail ?? "Ollama runtime をまだ確認していません。",
+        group: "ollama",
+        id: "ollama-models",
+        label: "Ollama models",
+        status: ollamaHealth?.status === "available" ? "pass" : "blocked",
+      },
+      {
+        detail: ollamaDiagnosticLog,
+        group: "ollama",
+        id: "ollama-patch-proposal",
+        label: "Ollama Patch Proposal",
+        status: ollamaDiagnosticLog.includes("mode: ollama")
+          ? "pass"
+          : ollamaDiagnosticLog.includes("mode: recorded")
+            ? "warning"
+            : "blocked",
+      },
+      {
+        detail: previewPreflight.reason,
+        group: "webcontainer",
+        id: "webcontainer-preflight",
+        label: "WebContainer preflight",
+        status: webContainerBlocked ? "blocked" : webContainerWarning ? "warning" : "pass",
+      },
+      {
+        detail: previewUrl || "WebContainer dev server URL は Local Preview 実行後に表示されます。",
+        group: "webcontainer",
+        id: "webcontainer-iframe",
+        label: "iframe preview",
+        status: previewMode === "webcontainer" && previewUrl ? "pass" : "warning",
+      },
+    ];
+  }, [
+    aiRuntimeStatus.providers,
+    branchPushed,
+    createdPrUrl,
+    githubConfigured,
+    ollamaDiagnosticLog,
+    previewMode,
+    previewPreflight.items,
+    previewPreflight.reason,
+    previewUrl,
+    pushedCommitSha,
+    selectedInstallationId,
+    selectedRepository,
+  ]);
   const currentStep = commitCreated ? "Commit draft 作成済み" : testsRun ? "PR 作成待ち" : patchApplied ? "Tests 実行待ち" : "変更中";
   const safetyStatus = testsRun
     ? commitCreated
@@ -1400,6 +1507,30 @@ export function App() {
               </section>
 
               <section className="assistant-section">
+                <PanelTitle title="E2E Diagnostics" />
+                <div className="diagnostic-grid">
+                  {(["github", "webllm", "ollama", "webcontainer"] as const).map((group) => (
+                    <div className="diagnostic-group" key={group}>
+                      <strong>{diagnosticGroupLabels[group]}</strong>
+                      <ul className="diagnostic-list">
+                        {runtimeDiagnostics
+                          .filter((item) => item.group === group)
+                          .map((item) => (
+                            <li className={`diagnostic-item diagnostic-item-${item.status}`} key={item.id}>
+                              {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                              <span>
+                                <strong>{item.label}</strong>
+                                {item.detail}
+                              </span>
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="assistant-section">
                 <PanelTitle title="Branch Goal" />
                 <textarea
                   className="markdown-editor"
@@ -1806,6 +1937,13 @@ const runtimeDescriptions: Record<AiRuntimeMode, string> = {
   ollama: "ローカル常駐モデルで重い判断を担当",
   recorded: "デモが必ず成立する再生モード",
   webllm: "ブラウザ内で小さな判断を担当",
+};
+
+const diagnosticGroupLabels: Record<RuntimeDiagnosticItem["group"], string> = {
+  github: "GitHub App",
+  ollama: "Ollama",
+  webcontainer: "WebContainer",
+  webllm: "WebLLM",
 };
 
 const monacoEditorOptions = {
