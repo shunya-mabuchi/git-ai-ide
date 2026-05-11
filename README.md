@@ -66,7 +66,11 @@ pnpm --filter @git-ai-ide/shared test
 pnpm --filter @git-ai-ide/web test
 pnpm -r typecheck
 pnpm --filter @git-ai-ide/web build
+pnpm test:e2e:install
+pnpm --filter @git-ai-ide/web test:e2e
 ```
+
+`pnpm test:e2e:install` は Playwright Chromium の初回インストール用です。CI でも同じ順序で typecheck / unit test / build / E2E を実行します。
 
 ## 無料公開の方針
 
