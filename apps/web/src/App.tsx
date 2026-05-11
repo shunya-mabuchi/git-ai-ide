@@ -45,6 +45,7 @@ import {
   supportsLocalDirectoryAccess,
   type WorkspaceSnapshot,
 } from "./workspace/localWorkspace";
+import { clearAssistedMemory, createAssistedMemoryProjectKey, loadAssistedMemory, saveAssistedMemory } from "./workspace/assistedMemory";
 import { createLocalPreviewPreflight, runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
 
 type FileName = string;
@@ -158,6 +159,7 @@ export function App() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
+  const [prDraftMarkdown, setPrDraftMarkdown] = useState("");
   const [branchName, setBranchName] = useState("feature/pr-summary");
   const [branchGoalMarkdown, setBranchGoalMarkdown] = useState(demoBranchGoal.markdown);
   const [newFilePath, setNewFilePath] = useState("src/features/pr-summary/notes.md");
@@ -188,6 +190,17 @@ export function App() {
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
+  );
+  const [memoryStatusMessage, setMemoryStatusMessage] = useState("Project memory は未保存です。");
+  const [memorySavedAt, setMemorySavedAt] = useState("");
+
+  const assistedMemoryProjectKey = useMemo(
+    () =>
+      createAssistedMemoryProjectKey({
+        repository: selectedRepository,
+        workspaceName,
+      }),
+    [selectedRepository, workspaceName],
   );
 
   const applyGitHubRepositories = (repositories: GitHubRepositoryOption[]) => {
@@ -315,6 +328,19 @@ export function App() {
       setWorkspaceError("workspace snapshot を保存できませんでした。");
     });
   }, [files, workspaceName, workspaceSource]);
+
+  useEffect(() => {
+    const record = loadAssistedMemory(assistedMemoryProjectKey);
+    if (!record) {
+      setMemorySavedAt("");
+      setMemoryStatusMessage("Project memory は未保存です。");
+      return;
+    }
+
+    setAssistedMemory(record.memory);
+    setMemorySavedAt(record.savedAt);
+    setMemoryStatusMessage("Project memory を復元しました。");
+  }, [assistedMemoryProjectKey]);
 
   useEffect(() => {
     if (!editorTarget || editorTarget.file !== selectedFile || diffOpen) return;
@@ -616,6 +642,32 @@ export function App() {
       : "Patch review が必要";
   const previewCommand = runtimePlan.devCommand ?? runtimePlan.previewCommand;
   const previewAvailable = Boolean(previewCommand);
+  const currentPrDraftMarkdown = useMemo(
+    () =>
+      createPrDraftMarkdown({
+        assistedMemory,
+        branchGoalMarkdown,
+        branchName,
+        changedFiles: gitStatus.entries,
+        previewChecked: previewRunState === "ready",
+        runtimeLabel: selectedRuntimeLabel,
+        safetyReady: safetyGate.canCreatePullRequest,
+        testsPassed: testsRun,
+        title: extractMarkdownTitle(branchGoalMarkdown) || "Git AI IDE PR",
+        warnings: runtimePlan.warnings,
+      }),
+    [
+      assistedMemory,
+      branchGoalMarkdown,
+      branchName,
+      gitStatus.entries,
+      previewRunState,
+      runtimePlan.warnings,
+      safetyGate.canCreatePullRequest,
+      selectedRuntimeLabel,
+      testsRun,
+    ],
+  );
 
   const openDiffPreview = () => {
     if (!patchTargetAvailable) {
@@ -1072,10 +1124,36 @@ export function App() {
       return;
     }
 
+    setPrDraftMarkdown(currentPrDraftMarkdown);
     setPrDraftGenerated(true);
     setPrDraftMode("preview");
     setBottomPanelMode("output");
     setBottomPanelCollapsed(false);
+  };
+
+  const saveProjectMemory = () => {
+    const record = saveAssistedMemory(assistedMemoryProjectKey, assistedMemory);
+    setMemorySavedAt(record.savedAt);
+    setMemoryStatusMessage("Project memory を保存しました。");
+  };
+
+  const restoreProjectMemory = () => {
+    const record = loadAssistedMemory(assistedMemoryProjectKey);
+    if (!record) {
+      setMemorySavedAt("");
+      setMemoryStatusMessage("保存済みの Project memory はありません。");
+      return;
+    }
+
+    setAssistedMemory(record.memory);
+    setMemorySavedAt(record.savedAt);
+    setMemoryStatusMessage("Project memory を復元しました。");
+  };
+
+  const clearProjectMemory = () => {
+    clearAssistedMemory(assistedMemoryProjectKey);
+    setMemorySavedAt("");
+    setMemoryStatusMessage("Project memory を削除しました。");
   };
 
   const createCommitDraft = () => {
@@ -1110,7 +1188,7 @@ export function App() {
     try {
       const result = await createGitHubPullRequest({
         baseBranch: "main",
-        body: demoPrDraft,
+        body: prDraftMarkdown || currentPrDraftMarkdown,
         branch: branchName,
         installationId: selectedInstallationId,
         repository: selectedRepository,
@@ -1733,7 +1811,11 @@ export function App() {
                       <button className={prDraftMode === "preview" ? "bottom-tab active" : "bottom-tab"} onClick={() => setPrDraftMode("preview")}>Preview</button>
                       <button className={prDraftMode === "raw" ? "bottom-tab active" : "bottom-tab"} onClick={() => setPrDraftMode("raw")}>Raw</button>
                     </div>
-                    {prDraftMode === "preview" ? <MarkdownPreview markdown={demoPrDraft} /> : <pre className="terminal-view">{demoPrDraft}</pre>}
+                    {prDraftMode === "preview" ? (
+                      <MarkdownPreview markdown={prDraftMarkdown || currentPrDraftMarkdown} />
+                    ) : (
+                      <pre className="terminal-view">{prDraftMarkdown || currentPrDraftMarkdown}</pre>
+                    )}
                   </div>
                 ) : createdPrUrl ? (
                   <pre className="terminal-view">{`Pull request created\n\n${createdPrUrl}`}</pre>
@@ -1876,6 +1958,15 @@ export function App() {
                   value={assistedMemory}
                   onChange={(event) => setAssistedMemory(event.target.value)}
                 />
+                <div className="memory-actions">
+                  <button className="button secondary" onClick={saveProjectMemory}>保存</button>
+                  <button className="button ghost" onClick={restoreProjectMemory}>復元</button>
+                  <button className="button ghost" onClick={clearProjectMemory}>削除</button>
+                </div>
+                <div className="memory-meta">
+                  <span>project: {assistedMemoryProjectKey}</span>
+                  <span>{memorySavedAt ? `saved: ${formatDateTime(memorySavedAt)}` : memoryStatusMessage}</span>
+                </div>
               </section>
 
               <section className="assistant-section patch-section">
@@ -2282,6 +2373,89 @@ function estimateTokens(text: string) {
 function formatTokenCount(value: number) {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
+}
+
+function createPrDraftMarkdown(input: {
+  assistedMemory: string;
+  branchGoalMarkdown: string;
+  branchName: string;
+  changedFiles: Array<{ file: string; status: string }>;
+  previewChecked: boolean;
+  runtimeLabel: string;
+  safetyReady: boolean;
+  testsPassed: boolean;
+  title: string;
+  warnings: string[];
+}) {
+  const changedFileLines =
+    input.changedFiles.length > 0
+      ? input.changedFiles.map((entry) => `- \`${entry.file}\` (${entry.status})`).join("\n")
+      : "- 差分なし。commit 前に変更内容を確認する。";
+  const memoryLines = toMarkdownBullets(input.assistedMemory, "- Project-specific memory は未設定。");
+  const goalSummary = extractSectionPreview(input.branchGoalMarkdown, "Goal") || input.title;
+  const acceptanceSummary = extractSectionPreview(input.branchGoalMarkdown, "Acceptance Criteria") || "Branch Goal の受け入れ条件に沿って確認する。";
+  const warnings =
+    input.warnings.length > 0 ? input.warnings.map((warning) => `- ${warning}`).join("\n") : "- runtime warning なし。";
+
+  return `# ${input.title}
+
+## 概要
+- branch: \`${input.branchName}\`
+- 目的: ${goalSummary}
+- 生成 runtime: ${input.runtimeLabel}
+
+## 変更内容
+${changedFileLines}
+
+## 受け入れ条件との対応
+${toMarkdownBullets(acceptanceSummary, "- Branch Goal を確認する。")}
+
+## Assisted Memory
+${memoryLines}
+
+## リスクと確認観点
+${warnings}
+- Safety gate: ${input.safetyReady ? "PR 作成可能" : "未完了項目あり"}
+- Preview: ${input.previewChecked ? "確認済み" : "未確認"}
+
+## テスト
+- ${input.testsPassed ? "Runtime checks / tests 実行済み" : "Tests 未実行"}
+`;
+}
+
+function toMarkdownBullets(value: string, fallback: string) {
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim().replace(/^[-*]\s*/, ""))
+    .filter(Boolean);
+
+  if (lines.length === 0) return fallback;
+  return lines.map((line) => `- ${line}`).join("\n");
+}
+
+function extractSectionPreview(markdown: string, heading: string) {
+  const lines = markdown.split("\n");
+  const headingIndex = lines.findIndex((line) => line.trim().toLowerCase() === `## ${heading}`.toLowerCase());
+  if (headingIndex < 0) return "";
+
+  const sectionLines: string[] = [];
+  for (const line of lines.slice(headingIndex + 1)) {
+    if (line.startsWith("## ")) break;
+    const normalized = line.trim().replace(/^[-*]\s*/, "");
+    if (normalized) sectionLines.push(normalized);
+    if (sectionLines.length >= 3) break;
+  }
+
+  return sectionLines.join("\n");
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ja-JP", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
 }
 
 function extractMarkdownTitle(markdown: string) {
