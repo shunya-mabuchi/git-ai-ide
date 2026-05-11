@@ -141,6 +141,8 @@ export function App() {
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
   const [aiRuntimeStatus, setAiRuntimeStatus] = useState(createDefaultRuntimeStatus());
   const [aiRuntimeCheckState, setAiRuntimeCheckState] = useState<"checking" | "ready">("checking");
+  const [ollamaDiagnosticState, setOllamaDiagnosticState] = useState<"idle" | "running">("idle");
+  const [ollamaDiagnosticLog, setOllamaDiagnosticLog] = useState("Ollama E2E 診断はまだ実行していません。");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
@@ -323,6 +325,7 @@ export function App() {
   });
   const selectedRuntimeLabel = runtimeLabels[aiRuntimeMode];
   const selectedRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === aiRuntimeMode);
+  const ollamaRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "ollama");
   const selectedRuntimeAvailable = selectedRuntimeHealth?.status === "available";
   const runtimePlan = useMemo(() => planRuntimeFromPackageJson(files), [files]);
   const safetyGate = useMemo(
@@ -401,6 +404,55 @@ export function App() {
       `${runtimeLabels[result.mode]} で patch proposal を生成しました。${result.warnings.length ? ` ${result.warnings.join(" / ")}` : ""}`,
     );
     setPatchGenerationState("idle");
+  };
+
+  const runOllamaDiagnostic = async () => {
+    setOllamaDiagnosticState("running");
+    setOllamaDiagnosticLog("Ollama E2E 診断を実行中...");
+
+    const modelId = ollamaRuntimeHealth?.modelIds[0];
+    const result = await requestPatchProposal({
+      allowedFiles: [selectedFile],
+      branchGoalMarkdown,
+      currentFile: {
+        content: currentFile,
+        path: selectedFile,
+      },
+      mode: "ollama",
+      modelId,
+      timeoutMs: 20_000,
+    });
+
+    if (result.ok) {
+      setActivePatch(result.proposal);
+      setPatchApplied(false);
+      setTestsRun(false);
+      setPrDraftGenerated(false);
+      setCommitCreated(false);
+      setBranchPushed(false);
+      setCreatedPrUrl("");
+      setPatchGenerationMessage(`Ollama E2E 診断から patch proposal を受け取りました。mode: ${result.mode}`);
+      setOllamaDiagnosticLog(
+        [
+          `mode: ${result.mode}`,
+          `model: ${modelId ?? "not detected"}`,
+          `proposal: ${result.proposal.title}`,
+          `edits: ${result.proposal.edits.length}`,
+          result.warnings.length ? `warnings: ${result.warnings.join(" / ")}` : "warnings: none",
+        ].join("\n"),
+      );
+    } else {
+      setOllamaDiagnosticLog(
+        [
+          `mode: ${result.mode}`,
+          `model: ${modelId ?? "not detected"}`,
+          `error: ${result.error}`,
+          result.warnings.length ? `warnings: ${result.warnings.join(" / ")}` : "warnings: none",
+        ].join("\n"),
+      );
+    }
+
+    setOllamaDiagnosticState("idle");
   };
 
   const openChangedFileDiff = (file: string) => {
@@ -1284,6 +1336,10 @@ export function App() {
                   <strong>Suggestion: {runtimeLabels[runtimeSuggestion]}</strong>
                   <span>Selected: {selectedRuntimeLabel}</span>
                   <span>{aiRuntimeCheckState === "checking" ? "runtime を確認中" : selectedRuntimeHealth?.detail}</span>
+                  <button className="button secondary" disabled={ollamaDiagnosticState === "running"} onClick={runOllamaDiagnostic}>
+                    {ollamaDiagnosticState === "running" ? "Ollama 診断中" : "Ollama E2E 診断"}
+                  </button>
+                  <pre className="diagnostic-log">{ollamaDiagnosticLog}</pre>
                 </div>
               </section>
 

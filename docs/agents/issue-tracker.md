@@ -444,3 +444,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で PR 作成前チェックに Local Preview checked / Branch pushed が表示されることを確認
   - PR は GitHub issue #27 に `Closes #27` で紐づける
   - PR #28 を merge 済み
+
+## GAI-020: Ollama Patch Proposal の E2E 診断 UI を追加する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/29
+- 背景: Ollama API から Patch Proposal を生成する経路は実装済みだが、UI 上で実 E2E と fallback のどちらが動いたかを確認しづらい。面接で「ブラウザ IDE がローカル LLM と相談し、安全に structured edit を受け取る」価値を説明するため、診断ログを明示する必要がある。
+- スコープ:
+  - Model Routing に Ollama E2E 診断ボタンを追加する
+  - 現在のファイルと Branch Goal を使って `requestPatchProposal` を実行する
+  - 実行 mode / model / proposal / warnings を UI に表示する
+  - Ollama が使えない場合も recorded fallback として結果を確認できる
+  - 診断で受け取った proposal を Patch Queue に反映する
+- 受け入れ条件:
+  - Ollama E2E 診断を UI から実行できる
+  - Ollama 未検出でも fallback mode と warning が表示される
+  - 診断結果の proposal が Patch Queue に反映される
+  - typecheck / web build が通る
+- 検証:
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で Ollama E2E 診断を実行し、未接続時に `mode: recorded` / `model: not detected` / warning が表示されることを確認
+  - browser で診断結果の proposal が Patch Queue に反映されることを確認
+  - PR は GitHub issue #29 に `Closes #29` で紐づける
+  - PR #30 を作成済み
