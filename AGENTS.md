@@ -1,60 +1,63 @@
-# Git AI IDE Agent Guide
+# Git AI IDE エージェントガイド
 
-## Project Goal
+## プロジェクトの目的
 
-Git AI IDE is a Git-aware browser IDE focused on safe AI-assisted Branch to PR workflows.
+Git AI IDE は、Git の Branch to PR workflow を前提にした、AI 支援つきブラウザ IDE です。
 
-The core principle is:
+目指しているのは「AI が勝手にコードを書き換える IDE」ではありません。LLM の出力を、Git の文脈、差分確認、テスト、PR 作成の流れに安全に載せることが目的です。
 
-> LLM proposes. IDE validates. User applies. Git records.
+基本原則:
 
-## Commands
+> LLM は提案する。IDE は検証する。ユーザーが適用する。Git が記録する。
 
-- Install: `pnpm install`
-- Web dev server: `pnpm dev`
-- Worker dev server: `pnpm dev:worker`
-- Type check: `pnpm typecheck`
-- Test: `pnpm test`
-- Build: `pnpm build`
+## コマンド
 
-## Tooling
+- 依存関係のインストール: `pnpm install`
+- Web 開発サーバー: `pnpm dev`
+- Worker 開発サーバー: `pnpm dev:worker`
+- 型チェック: `pnpm typecheck`
+- テスト: `pnpm test`
+- ビルド: `pnpm build`
 
-- Package manager: pnpm
-- Runtime: Node.js 22
-- Web app: React + TypeScript + Vite
+## 技術構成
+
+- パッケージマネージャー: pnpm
+- 実行環境: Node.js 24 LTS
+- Web アプリ: React + TypeScript + Vite
 - Worker: Cloudflare Workers
-- DB: Cloudflare D1 for workflow metadata only
-- Editor target: Monaco Editor
-- Git target: isomorphic-git
-- AI target: WebLLM primary, Ollama fallback
-- Runtime target: WebContainer
+- DB: Cloudflare D1。保存対象は workflow metadata のみ
+- Editor: Monaco Editor
+- Git: isomorphic-git を最終方針にし、MVP では snapshot diff helper も使う
+- AI: WebLLM を primary、Ollama を first-class fallback
+- Runtime: WebContainer を候補にし、未対応環境では recorded fallback
 
-## Safety Rules
+## 安全ルール
 
-- Do not store code text, diff text, GitHub tokens, or full LLM prompts in D1.
-- AI edits must go through Structured Edit Operation, Patch Queue, and Diff Preview.
-- Keep GitHub access scoped to selected repositories.
-- Do not introduce cloud LLM inference as a required path.
-- Prefer local-first state for workspace data.
+- D1 に code text、diff text、GitHub token、LLM prompt 全文、private file content を保存しない。
+- AI の修正は Structured Edit Operation、Patch Queue、Diff Preview を通す。
+- GitHub 連携はユーザーが選択した repository のみに限定する。
+- cloud LLM inference を必須経路にしない。
+- workspace data は local-first を基本にする。
+- demo mode は demo と明示し、本物の GitHub/WebLLM/Ollama/WebContainer 実行として説明しない。
 
-## Directory Map
+## ディレクトリ構成
 
-- `apps/web`: browser IDE
-- `apps/worker`: Cloudflare Worker for GitHub auth/proxy and D1 metadata APIs
-- `packages/shared`: shared types
-- `packages/ai-runtime`: AI provider abstractions
-- `packages/patch-core`: Structured Edit Operation validation and patch helpers
-- `packages/git-core`: Git workflow types and helpers
-- `docs`: development and architecture notes
+- `apps/web`: ブラウザ IDE
+- `apps/worker`: GitHub auth/proxy と D1 metadata API を担当する Cloudflare Worker
+- `packages/shared`: 共有型
+- `packages/ai-runtime`: AI provider abstraction
+- `packages/patch-core`: Structured Edit Operation の検証と patch helper
+- `packages/git-core`: Git workflow の型と helper
+- `docs`: 開発、設計、運用メモ
 
-## Agent skills
+## エージェント作業フロー
 
-This repository follows an issue-first agentic engineering workflow.
+このリポジトリは issue-first の agentic engineering workflow で進めます。
 
-- Read `CONTEXT.md` before changing product behavior.
-- Use `docs/agents/issue-tracker.md` as the local issue tracker until GitHub Issues is connected.
-- Use `docs/agents/domain.md` for product language, safety rules, and architectural boundaries.
-- Use `docs/agents/triage-labels.md` when classifying work.
-- Before implementing a non-trivial feature, add or update an issue with scope, acceptance criteria, and verification.
-- Prefer small vertical slices, but group related implementation work into a single coherent task when the user asks to avoid chat overhead.
-- Keep demo-mode boundaries explicit. Do not present demo GitHub, demo WebLLM, demo Ollama, or demo WebContainer behavior as production-complete.
+- プロダクトの挙動を変える前に `CONTEXT.md` を読む。
+- GitHub Issues と同期するため、`docs/agents/issue-tracker.md` をローカル Issue 管理として使う。
+- プロダクト用語、安全ルール、architecture boundary は `docs/agents/domain.md` を参照する。
+- 作業を分類するときは `docs/agents/triage-labels.md` を使う。
+- 重要な機能追加や設計変更の前に、scope、acceptance criteria、verification を issue に書く。
+- ユーザーがチャット往復を減らしたい場合は、関連する作業を coherent task としてまとめて進める。
+- 小さく縦に切る方針は維持しつつ、途中で止まる必要があるのは仕様判断、危険な操作、外部認証、破壊的変更が必要な場合に限る。

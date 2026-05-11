@@ -27,7 +27,7 @@ GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY--
 Worker の WebCrypto では PKCS#8 形式の `-----BEGIN PRIVATE KEY-----` を想定しています。
 `-----BEGIN RSA PRIVATE KEY-----` の場合は PKCS#8 に変換してから設定します。
 
-## Worker API
+## Worker API 一覧
 
 - `GET /api/github/setup`
 - `GET /api/github/install-url`

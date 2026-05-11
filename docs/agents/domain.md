@@ -1,28 +1,28 @@
-# Domain Notes
+# ドメインメモ
 
-## Ubiquitous Language
+## 共通言語
 
-- **Branch Goal**: Markdown description of what the branch is trying to achieve.
-- **Context Pack**: The bounded context sent to AI: current file, diff, branch goal, assisted memory, and budget metadata.
-- **Patch Proposal**: AI-generated structured edit proposal. It is not applied automatically.
-- **Structured Edit Operation**: A safe edit shape with `file`, `find`, `replacement`, and `reason`.
-- **Patch Queue**: Holding area for proposed edits before user review.
-- **Diff Review**: Monaco diff view used before applying patch or creating commit.
-- **Safety Gate**: Soft gate that checks branch goal, context, model capability, patch review, tests, commit draft, PR draft, and unresolved warnings.
-- **Recorded AI**: Deterministic demo fallback so the portfolio demo works without model setup.
-- **WebLLM**: Browser-local model path for small tasks.
-- **Ollama fallback**: Local desktop model path for larger tasks.
-- **Runtime Plan**: Detected execution capability, such as WebContainer candidate or recorded fallback.
+- **Branch Goal**: その branch で何を達成するかを記述する Markdown。AI に渡す context の中心になる。
+- **Context Pack**: AI に渡す bounded context。current file、diff、Branch Goal、Assisted Memory、budget metadata を含む。
+- **Patch Proposal**: AI が生成する structured edit proposal。自動適用はしない。
+- **Structured Edit Operation**: `file`、`find`、`replacement`、`reason` を持つ安全な編集形式。
+- **Patch Queue**: ユーザーが review する前に、提案された edit を保持する場所。
+- **Diff Review**: patch apply や commit 前に確認する Monaco diff view。
+- **Safety Gate**: Branch Goal、context、model capability、patch review、test、commit draft、PR draft、未解決 warning を確認する soft gate。
+- **Recorded AI**: model setup なしでも portfolio demo が成立する deterministic demo fallback。
+- **WebLLM**: 小さな task を browser-local model で処理する runtime path。
+- **Ollama fallback**: より大きな task を local desktop model で処理する runtime path。
+- **Runtime Plan**: WebContainer candidate や recorded fallback など、実行可能性を検出した結果。
 
-## Safety Principles
+## 安全原則
 
-- AI never writes directly to Git history.
-- AI output should become structured data first.
-- User reviews diff before applying.
-- Commit and PR creation are gated by visible checks.
-- Local/private code must stay local unless the user explicitly uses GitHub integration.
+- AI は Git history に直接書き込まない。
+- AI output はまず structured data として扱う。
+- ユーザーは patch apply 前に diff を確認する。
+- commit と PR creation は visible check を通す。
+- local/private code は、ユーザーが明示的に GitHub integration を使うまで local に留める。
 
-## Data Ownership
+## データの所在
 
 Browser:
 
@@ -45,6 +45,8 @@ GitHub:
 - commit
 - PR
 
-## Demo Boundary
+## デモ境界
 
-Demo mode is a first-class product mode. It exists to make the portfolio review reliable. It must be labeled as demo and should not be described as real GitHub, WebLLM, Ollama, or WebContainer execution.
+Demo mode は first-class product mode です。portfolio review を安定させるために存在します。
+
+ただし、demo は必ず demo と表示します。本物の GitHub、WebLLM、Ollama、WebContainer 実行として説明してはいけません。

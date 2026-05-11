@@ -28,7 +28,7 @@ pnpm dev
 http://127.0.0.1:5173
 ```
 
-## Worker
+## Worker 開発サーバー
 
 ```bash
 pnpm dev:worker
@@ -48,7 +48,7 @@ pnpm test
 pnpm build
 ```
 
-## Ollama fallback
+## Ollama fallback の起動
 
 Ollama はホストで起動します。
 

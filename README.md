@@ -1,31 +1,31 @@
 # Git AI IDE
 
-Git AI IDE is a Git-aware browser IDE for safe AI-assisted Branch to PR workflows.
+Git AI IDE は、Git の Branch to PR workflow を安全に進めるための AI 支援つきブラウザ IDE です。
 
-The project focuses on **AI workflow safety**:
+中心に置いているのは **AI workflow safety** です。
 
-- LLMs propose changes.
-- The IDE validates structured edits.
-- Users review diffs.
-- Git records the final decision.
+- LLM が変更案を提案する。
+- IDE が structured edit として検証する。
+- ユーザーが diff を確認する。
+- Git が最終判断を履歴として記録する。
 
-## Current Status
+## 現在の状態
 
-This repository now contains a working MVP shell for the full Branch to PR flow:
+このリポジトリには、Branch to PR flow の MVP shell が入っています。
 
-- VS Code-like browser IDE layout
-- Monaco Editor and Monaco Diff Editor
-- demo repo plus local directory snapshot loading
-- IndexedDB workspace persistence
-- snapshot-based Git status, diff review, commit draft, push demo, and PR creation demo
-- Patch Queue with structured edit validation
-- AI runtime routing for Recorded AI / WebLLM / Ollama fallback
-- Context Pack budget meter and editable Branch Goal / Assisted Memory
-- Runtime planning for test/typecheck commands
-- Cloudflare Worker API boundary for GitHub repository and PR helper flows
-- Cloudflare D1 schema for workflow metadata only
+- VS Code / Cursor 風のブラウザ IDE layout
+- Monaco Editor と Monaco Diff Editor
+- demo repo とローカル directory snapshot の読み込み
+- IndexedDB による workspace 復元
+- snapshot ベースの Git status、diff review、commit draft、push demo、PR creation demo
+- structured edit validation つき Patch Queue
+- Recorded AI / WebLLM / Ollama fallback の runtime routing
+- Context Pack budget meter と編集可能な Branch Goal / Assisted Memory
+- test/typecheck command の Runtime Plan
+- GitHub repository / PR helper flow のための Cloudflare Worker API boundary
+- workflow metadata のみを保存する Cloudflare D1 schema
 
-## Architecture Direction
+## アーキテクチャ方針
 
 - Web app: `apps/web`
 - Worker: `apps/worker`
@@ -34,44 +34,44 @@ This repository now contains a working MVP shell for the full Branch to PR flow:
 - AI runtime abstraction: `packages/ai-runtime`
 - Git helpers: `packages/git-core`
 
-## Development
+## 開発
 
-See [docs/development.md](docs/development.md).
+詳しくは [docs/development.md](docs/development.md) を参照してください。
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Docker is not required for initial development. Git AI IDE depends heavily on host browser capabilities such as WebGPU, File System Access API, WebContainer, and localhost Ollama access.
+初期開発では Docker を必須にしていません。Git AI IDE は WebGPU、File System Access API、WebContainer、localhost の Ollama access など、ホストブラウザとホスト OS の機能に強く依存するためです。
 
-## Privacy-Aware D1 Policy
+## D1 のプライバシー方針
 
-D1 stores Branch to PR workflow metadata only.
+D1 は Branch to PR workflow metadata のみを保存します。
 
-Stored:
+保存するもの:
 
-- sessions
+- session
 - repository metadata
-- branch names
-- AI action summaries
-- patch proposal statuses
-- safety gate results
-- PR URLs
+- branch name
+- AI action summary
+- patch proposal status
+- safety gate result
+- PR URL
 
-Not stored:
+保存しないもの:
 
 - code text
 - diff text
-- GitHub tokens
-- full LLM prompts
+- GitHub token
+- LLM prompt 全文
 - private file content
 
-## Docs
+## ドキュメント
 
 - [PRD / Architecture / MVP Milestones](git-ai-ide_prd_architecture_milestones.md)
-- [Technical Decisions](git-ai-ide_technical_decisions.md)
-- [Interview Notes](git-ai-ide_interview_notes.md)
-- [Project Ideas](portfolio_project_ideas.md)
-- [MVP Implementation Status](docs/mvp-implementation-status.md)
-- [GitHub App Setup](docs/github-app-setup.md)
+- [技術選定メモ](git-ai-ide_technical_decisions.md)
+- [面接用アピール資料](git-ai-ide_interview_notes.md)
+- [プロジェクト案](portfolio_project_ideas.md)
+- [MVP 実装状況](docs/mvp-implementation-status.md)
+- [GitHub App セットアップ](docs/github-app-setup.md)

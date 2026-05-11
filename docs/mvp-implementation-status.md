@@ -15,7 +15,7 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 - Monaco Editor
 - Monaco Diff Editor
 
-### Workspace
+### Workspace 管理
 
 - demo repo
 - File System Access API によるローカル directory snapshot 読み込み
@@ -45,13 +45,13 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 - Patch Queue safety checklist
 - PR 作成前 Safety Gate
 
-### Runtime
+### Runtime 管理
 
 - package.json から test / typecheck script を推定
 - WebContainer candidate / recorded fallback の runtime plan
 - demo test log
 
-### Cloudflare Worker
+### Cloudflare Worker 境界
 
 - `/health`
 - `/api/sessions`

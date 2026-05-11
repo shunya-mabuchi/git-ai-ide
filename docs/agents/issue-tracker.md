@@ -1,6 +1,6 @@
-# ローカル Issue Tracker
+# ローカル Issue 管理
 
-GitHub Issues と同期するためのローカル issue tracker です。
+GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## Issue テンプレート
 
@@ -136,3 +136,24 @@ GitHub Issues と同期するためのローカル issue tracker です。
 - 検証:
   - browser test
   - typecheck/build
+
+## GAI-008: Markdown ドキュメントを日本語へ統一する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:ドキュメント`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/4
+- 背景: ユーザーが読む Markdown に英語の見出し・説明が残っており、ポートフォリオとして確認するときの理解コストが高い。
+- スコープ:
+  - `AGENTS.md` を日本語化する
+  - `README.md` を日本語化する
+  - `CONTEXT.md` を日本語化する
+  - `docs/agents/domain.md` を日本語化する
+  - 既存 Markdown を見直し、英語が残る箇所は技術名として必要か確認する
+- 受け入れ条件:
+  - 主要な説明文と見出しが日本語で読める
+  - 技術名、API 名、コマンド名は必要に応じて英語のまま残す
+  - Agent workflow の運用ルールが日本語で理解できる
+- 検証:
+  - Markdown 見出し確認済み
+  - `pnpm -r typecheck` 成功
