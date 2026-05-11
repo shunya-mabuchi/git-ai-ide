@@ -43,6 +43,14 @@ export type PatchProposalRequest = {
   mode: AiExecutionMode;
 };
 
+export type PatchProposalProviderRequest = PatchProposalRequest & {
+  allowedFiles?: string[];
+  fetchImpl?: typeof fetch;
+  modelId?: string;
+  ollamaBaseUrl?: string;
+  timeoutMs?: number;
+};
+
 export type LlmPatchProposalParseRequest = {
   allowedFiles?: string[];
   branchGoalMarkdown: string;
@@ -403,6 +411,50 @@ export function generatePatchProposal(request: PatchProposalRequest): PatchPropo
   };
 }
 
+export async function requestPatchProposal(request: PatchProposalProviderRequest): Promise<PatchProposalResult> {
+  if (request.mode !== "ollama") {
+    return generatePatchProposal(request);
+  }
+
+  const fetchImpl = request.fetchImpl ?? globalThis.fetch;
+  const modelId = request.modelId;
+
+  if (!fetchImpl || !modelId) {
+    const fallback = generatePatchProposal({ ...request, mode: "recorded" });
+    return appendWarnings(fallback, ["Ollama model が未設定のため Recorded AI に fallback しました。"]);
+  }
+
+  try {
+    const rawText = await generateOllamaPatchJson({
+      baseUrl: request.ollamaBaseUrl ?? "http://localhost:11434",
+      branchGoalMarkdown: request.branchGoalMarkdown,
+      currentFile: request.currentFile,
+      fetchImpl,
+      modelId,
+      timeoutMs: request.timeoutMs ?? 30_000,
+    });
+
+    const parsed = parseLlmPatchProposal({
+      allowedFiles: request.allowedFiles ?? [request.currentFile.path],
+      branchGoalMarkdown: request.branchGoalMarkdown,
+      mode: "ollama",
+      rawText,
+    });
+
+    if (parsed.ok) return parsed;
+
+    const fallback = generatePatchProposal({ ...request, mode: "recorded" });
+    return appendWarnings(fallback, [`Ollama response を検証できませんでした: ${parsed.error}`, ...parsed.warnings]);
+  } catch (error) {
+    const fallback = generatePatchProposal({ ...request, mode: "recorded" });
+    return appendWarnings(fallback, [
+      error instanceof Error
+        ? `Ollama request に失敗しました: ${error.message}`
+        : "Ollama request に失敗しました。",
+    ]);
+  }
+}
+
 export function parseLlmPatchProposal(request: LlmPatchProposalParseRequest): PatchProposalResult {
   const parsed = parseJsonObject(request.rawText);
 
@@ -436,6 +488,85 @@ export function parseLlmPatchProposal(request: LlmPatchProposalParseRequest): Pa
     proposal: validation.proposal,
     warnings: validation.warnings,
   };
+}
+
+async function generateOllamaPatchJson(input: {
+  baseUrl: string;
+  branchGoalMarkdown: string;
+  currentFile: { content: string; path: string };
+  fetchImpl: typeof fetch;
+  modelId: string;
+  timeoutMs: number;
+}) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), input.timeoutMs);
+
+  try {
+    const response = await input.fetchImpl(`${input.baseUrl}/api/generate`, {
+      body: JSON.stringify({
+        format: "json",
+        model: input.modelId,
+        options: {
+          temperature: 0.1,
+        },
+        prompt: createPatchProposalPrompt(input.branchGoalMarkdown, input.currentFile),
+        stream: false,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { response?: unknown };
+    if (typeof payload.response !== "string") {
+      throw new Error("Ollama response field が string ではありません。");
+    }
+
+    return payload.response;
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function createPatchProposalPrompt(branchGoalMarkdown: string, currentFile: { content: string; path: string }) {
+  return [
+    "あなたは Git AI IDE の patch proposal generator です。",
+    "次の JSON object だけを返してください。Markdown fence や説明文は禁止です。",
+    "",
+    "{",
+    '  "title": "短い日本語タイトル",',
+    '  "summary": "変更の狙いを日本語で説明",',
+    '  "edits": [',
+    "    {",
+    `      "file": ${JSON.stringify(currentFile.path)},`,
+    '      "operation": "replace",',
+    '      "find": "現在のファイルに存在する完全一致テキスト",',
+    '      "replacement": "置換後のテキスト",',
+    '      "reason": "なぜこの変更が必要か"',
+    "    }",
+    "  ]",
+    "}",
+    "",
+    "制約:",
+    "- operation は replace のみ。",
+    "- file は現在のファイルだけ。",
+    "- find は現在のファイル内に完全一致する短い範囲。",
+    "- replacement は最小変更。",
+    "",
+    "Branch Goal:",
+    branchGoalMarkdown,
+    "",
+    `Current file: ${currentFile.path}`,
+    "```",
+    currentFile.content.slice(0, 12_000),
+    "```",
+  ].join("\n");
 }
 
 export function planRuntimeFromPackageJson(files: Record<string, string>): RuntimePlan {
@@ -612,4 +743,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readString(record: Record<string, unknown>, key: string) {
   const value = record[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+function appendWarnings(result: PatchProposalResult, warnings: string[]): PatchProposalResult {
+  return {
+    ...result,
+    warnings: [...warnings, ...result.warnings],
+  };
 }

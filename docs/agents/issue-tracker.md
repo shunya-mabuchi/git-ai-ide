@@ -392,3 +392,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - PR は GitHub issue #23 に `Closes #23` で紐づける
   - PR #24 を merge 済み
+
+## GAI-018: Ollama 実 API から Patch Proposal を生成する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/25
+- 背景: LLM response の JSON validation 境界は入ったが、Ollama の実 API 呼び出しとはまだ接続されていない。ローカル LLM と相談して patch proposal を作る体験に近づけるため、Ollama `/api/generate` の structured JSON response を validation に通す必要がある。
+- スコープ:
+  - ai-runtime に Ollama patch proposal request を追加する
+  - `/api/generate` に `stream: false` / `format: "json"` で問い合わせる
+  - 返却された response を parseLlmPatchProposal に通す
+  - 失敗時は recorded generator に fallback する
+  - App の AI patch 生成を async provider flow に接続する
+- 受け入れ条件:
+  - Ollama mode で fetch が呼ばれる
+  - valid Ollama response から PatchProposal を生成できる
+  - Ollama failure 時に fallback できる
+  - ai-runtime test / typecheck / web build が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - browser で async patch proposal flow を確認
+  - PR は GitHub issue #25 に `Closes #25` で紐づける
+  - PR #26 を merge 済み

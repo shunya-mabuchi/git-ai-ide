@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectBrowserAiRuntime, generatePatchProposal, parseLlmPatchProposal, planRuntimeFromPackageJson } from "./index";
+import { detectBrowserAiRuntime, generatePatchProposal, parseLlmPatchProposal, planRuntimeFromPackageJson, requestPatchProposal } from "./index";
 
 describe("detectBrowserAiRuntime", () => {
   it("uses recorded mode when WebGPU and Ollama are unavailable", async () => {
@@ -215,5 +215,91 @@ describe("parseLlmPatchProposal", () => {
       ok: false,
       error: "許可されていない file path への edit です: package.json",
     });
+  });
+});
+
+describe("requestPatchProposal", () => {
+  it("calls Ollama generate and validates the structured response", async () => {
+    const calls: Array<{ body: unknown; url: string }> = [];
+    const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        url: String(url),
+      });
+
+      return new Response(
+        JSON.stringify({
+          response: JSON.stringify({
+            edits: [
+              {
+                file: "src/App.tsx",
+                find: "const title = 'old';",
+                operation: "replace",
+                reason: "Branch Goal に合わせるため。",
+                replacement: "const title = 'new';",
+              },
+            ],
+            summary: "タイトルを更新します。",
+            title: "タイトル更新",
+          }),
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const result = await requestPatchProposal({
+      branchGoalMarkdown: "# Branch Goal",
+      currentFile: {
+        content: "const title = 'old';",
+        path: "src/App.tsx",
+      },
+      fetchImpl,
+      mode: "ollama",
+      modelId: "qwen2.5-coder:7b",
+      ollamaBaseUrl: "http://localhost:11434",
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      body: {
+        format: "json",
+        model: "qwen2.5-coder:7b",
+        stream: false,
+      },
+      url: "http://localhost:11434/api/generate",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      mode: "ollama",
+      proposal: {
+        title: "タイトル更新",
+      },
+    });
+  });
+
+  it("falls back to recorded proposal when Ollama fails", async () => {
+    const fetchImpl = (async () => new Response("{}", { status: 500 })) as typeof fetch;
+
+    const result = await requestPatchProposal({
+      branchGoalMarkdown: "# Branch Goal",
+      currentFile: {
+        content: `export function generateSummary(diff: string) {
+  const changedFiles = extractChangedFiles(diff);
+}`,
+        path: "src/features/pr-summary/generateSummary.ts",
+      },
+      fetchImpl,
+      mode: "ollama",
+      modelId: "qwen2.5-coder:7b",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      mode: "recorded",
+      proposal: {
+        title: "空の diff 入力を扱う",
+      },
+    });
+    expect(result.warnings[0]).toContain("Ollama request に失敗しました");
   });
 });
