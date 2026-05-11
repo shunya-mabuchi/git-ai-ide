@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectBrowserAiRuntime, generatePatchProposal, planRuntimeFromPackageJson } from "./index";
+import { detectBrowserAiRuntime, generatePatchProposal, parseLlmPatchProposal, planRuntimeFromPackageJson } from "./index";
 
 describe("detectBrowserAiRuntime", () => {
   it("uses recorded mode when WebGPU and Ollama are unavailable", async () => {
@@ -139,6 +139,81 @@ describe("generatePatchProposal", () => {
     ).toMatchObject({
       ok: false,
       error: "現在のファイルが空のため、structured edit を生成できません。",
+    });
+  });
+});
+
+describe("parseLlmPatchProposal", () => {
+  it("parses valid structured edit JSON into a patch proposal", () => {
+    expect(
+      parseLlmPatchProposal({
+        allowedFiles: ["src/App.tsx"],
+        branchGoalMarkdown: "# Branch Goal",
+        mode: "ollama",
+        rawText: JSON.stringify({
+          edits: [
+            {
+              file: "src/App.tsx",
+              find: "const title = 'old';",
+              operation: "replace",
+              reason: "タイトルを branch goal に合わせるため。",
+              replacement: "const title = 'new';",
+            },
+          ],
+          summary: "タイトルを更新します。",
+          title: "タイトル更新",
+        }),
+      }),
+    ).toMatchObject({
+      ok: true,
+      proposal: {
+        edits: [
+          {
+            file: "src/App.tsx",
+            operation: "replace",
+          },
+        ],
+        status: "ready",
+      },
+    });
+  });
+
+  it("rejects invalid JSON", () => {
+    expect(
+      parseLlmPatchProposal({
+        branchGoalMarkdown: "# Branch Goal",
+        mode: "ollama",
+        rawText: "not json",
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: "LLM response に JSON object が見つかりませんでした。",
+    });
+  });
+
+  it("rejects edits outside allowed files", () => {
+    expect(
+      parseLlmPatchProposal({
+        allowedFiles: ["src/App.tsx"],
+        branchGoalMarkdown: "# Branch Goal",
+        mode: "ollama",
+        rawText: JSON.stringify({
+          edits: [
+            {
+              file: "package.json",
+              find: "\"name\"",
+              operation: "replace",
+              reason: "不正な対象を試すため。",
+              replacement: "\"private\"",
+            },
+          ],
+          summary: "不正な対象です。",
+          title: "対象外 edit",
+        }),
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: "許可されていない file path への edit です: package.json",
     });
   });
 });

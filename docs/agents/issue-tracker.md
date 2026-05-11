@@ -366,3 +366,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - browser で検索結果クリック後に該当行が表示されることを確認
   - PR は GitHub issue #21 に `Closes #21` で紐づける
   - PR #22 を merge 済み
+
+## GAI-017: LLM の structured edit JSON を検証して Patch Proposal に変換する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/23
+- 背景: AI Patch Proposal は recorded generator まで実装済みだが、WebLLM / Ollama の実レスポンスを安全に Patch Queue へ入れる schema validation がない。LLM 出力をそのまま適用せず、structured edit schema と対象ファイル条件を検証する必要がある。
+- スコープ:
+  - ai-runtime に LLM JSON parse / validation 境界を追加する
+  - PatchProposal と StructuredEdit の必須項目を検証する
+  - replace operation 以外を拒否する
+  - 対象ファイル外への edit を拒否する option を追加する
+  - validation 成功時は PatchProposalResult として返す
+  - validation 失敗時は日本語 error と warnings を返す
+- 受け入れ条件:
+  - valid JSON から PatchProposal を生成できる
+  - invalid JSON / 不完全 schema を拒否できる
+  - 許可されていない file path を拒否できる
+  - ai-runtime test / typecheck が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm -r typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - PR は GitHub issue #23 に `Closes #23` で紐づける
+  - PR #24 を merge 済み
