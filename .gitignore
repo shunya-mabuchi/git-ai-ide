@@ -1,0 +1,12 @@
+node_modules
+dist
+.turbo
+.wrangler
+.dev.vars
+.env
+.env.local
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+

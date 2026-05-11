@@ -1,0 +1,4 @@
+GITHUB_APP_ID="123456"
+GITHUB_APP_SLUG="git-ai-ide-dev"
+GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
