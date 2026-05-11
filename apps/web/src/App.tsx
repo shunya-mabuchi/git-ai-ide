@@ -1,9 +1,13 @@
 import {
   Bot,
   CheckCircle2,
+  ChevronRight,
   Circle,
   Code2,
+  File,
   Files,
+  Folder,
+  FolderOpen,
   GitBranch,
   GitPullRequest,
   Play,
@@ -46,6 +50,13 @@ type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
 
+type ExplorerNode = {
+  children: ExplorerNode[];
+  name: string;
+  path: string;
+  type: "directory" | "file";
+};
+
 const aiMessages = [
   {
     title: "差分の説明",
@@ -82,6 +93,7 @@ export function App() {
   const [explorerWidth, setExplorerWidth] = useState(260);
   const [assistantWidth, setAssistantWidth] = useState(360);
   const [explorerVisible, setExplorerVisible] = useState(true);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(["src", "src/features", "src/features/pr-summary"]));
   const [sidePanelMode, setSidePanelMode] = useState<SidePanelMode>("explorer");
   const [assistantVisible, setAssistantVisible] = useState(true);
   const [bottomPanelMode, setBottomPanelMode] = useState<BottomPanelMode>("terminal");
@@ -242,6 +254,7 @@ export function App() {
   }, [files, workspaceName, workspaceSource]);
 
   const fileNames = useMemo(() => Object.keys(files).sort(), [files]);
+  const explorerTree = useMemo(() => buildExplorerTree(fileNames), [fileNames]);
   const gitStatus = useMemo(
     () =>
       createSnapshotGitStatus({
@@ -683,18 +696,26 @@ export function App() {
                     </div>
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
                     <nav className="file-list">
-                      {fileNames.map((file) => (
-                        <button
-                          className={file === selectedFile ? "file-item active" : "file-item"}
-                          key={file}
-                          onClick={() => {
-                            setSelectedFile(file);
-                            setDiffOpen(false);
-                          }}
-                        >
-                          {file}
-                        </button>
-                      ))}
+                      <ExplorerTree
+                        expandedFolders={expandedFolders}
+                        nodes={explorerTree}
+                        onSelectFile={(file) => {
+                          setSelectedFile(file);
+                          setDiffOpen(false);
+                        }}
+                        onToggleFolder={(folder) => {
+                          setExpandedFolders((current) => {
+                            const next = new Set(current);
+                            if (next.has(folder)) {
+                              next.delete(folder);
+                            } else {
+                              next.add(folder);
+                            }
+                            return next;
+                          });
+                        }}
+                        selectedFile={selectedFile}
+                      />
                     </nav>
                   </section>
 
@@ -1118,6 +1139,89 @@ function PanelTitle({ title }: { title: string }) {
   return <h2 className="panel-title">{title}</h2>;
 }
 
+function ExplorerTree({
+  expandedFolders,
+  nodes,
+  onSelectFile,
+  onToggleFolder,
+  selectedFile,
+}: {
+  expandedFolders: Set<string>;
+  nodes: ExplorerNode[];
+  onSelectFile: (file: string) => void;
+  onToggleFolder: (folder: string) => void;
+  selectedFile: string;
+}) {
+  return (
+    <>
+      {nodes.map((node) => (
+        <ExplorerTreeNode
+          expandedFolders={expandedFolders}
+          key={node.path}
+          node={node}
+          onSelectFile={onSelectFile}
+          onToggleFolder={onToggleFolder}
+          selectedFile={selectedFile}
+        />
+      ))}
+    </>
+  );
+}
+
+function ExplorerTreeNode({
+  depth = 0,
+  expandedFolders,
+  node,
+  onSelectFile,
+  onToggleFolder,
+  selectedFile,
+}: {
+  depth?: number;
+  expandedFolders: Set<string>;
+  node: ExplorerNode;
+  onSelectFile: (file: string) => void;
+  onToggleFolder: (folder: string) => void;
+  selectedFile: string;
+}) {
+  if (node.type === "directory") {
+    const expanded = expandedFolders.has(node.path);
+
+    return (
+      <div className="tree-group">
+        <button className="tree-item folder-item" onClick={() => onToggleFolder(node.path)} style={{ paddingLeft: 8 + depth * 14 }}>
+          <ChevronRight className={expanded ? "tree-chevron expanded" : "tree-chevron"} size={14} />
+          {expanded ? <FolderOpen size={15} /> : <Folder size={15} />}
+          <span>{node.name}</span>
+        </button>
+        {expanded
+          ? node.children.map((child) => (
+              <ExplorerTreeNode
+                depth={depth + 1}
+                expandedFolders={expandedFolders}
+                key={child.path}
+                node={child}
+                onSelectFile={onSelectFile}
+                onToggleFolder={onToggleFolder}
+                selectedFile={selectedFile}
+              />
+            ))
+          : null}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className={node.path === selectedFile ? "tree-item file-item active" : "tree-item file-item"}
+      onClick={() => onSelectFile(node.path)}
+      style={{ paddingLeft: 28 + depth * 14 }}
+    >
+      <File size={14} />
+      <span>{node.name}</span>
+    </button>
+  );
+}
+
 function MarkdownPreview({ markdown }: { markdown: string }) {
   const blocks = markdown.split(/\n(?=##? )/);
 
@@ -1156,6 +1260,42 @@ function renderMarkdownLine(line: string) {
   if (!line.trim()) return null;
   if (line.startsWith("- ")) return <p className="markdown-list-item" key={line}>{line.replace(/^- /, "")}</p>;
   return <p key={line}>{line}</p>;
+}
+
+function buildExplorerTree(fileNames: string[]): ExplorerNode[] {
+  const root: ExplorerNode[] = [];
+
+  for (const fileName of fileNames) {
+    const parts = fileName.split("/").filter(Boolean);
+    let currentLevel = root;
+    let currentPath = "";
+
+    parts.forEach((part, index) => {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      const isFile = index === parts.length - 1;
+      let node = currentLevel.find((candidate) => candidate.name === part && candidate.type === (isFile ? "file" : "directory"));
+
+      if (!node) {
+        node = {
+          children: [],
+          name: part,
+          path: currentPath,
+          type: isFile ? "file" : "directory",
+        };
+        currentLevel.push(node);
+        currentLevel.sort(compareExplorerNodes);
+      }
+
+      currentLevel = node.children;
+    });
+  }
+
+  return root;
+}
+
+function compareExplorerNodes(left: ExplorerNode, right: ExplorerNode) {
+  if (left.type !== right.type) return left.type === "directory" ? -1 : 1;
+  return left.name.localeCompare(right.name);
 }
 
 function clamp(value: number, min: number, max: number) {
