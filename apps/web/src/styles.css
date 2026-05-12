@@ -835,6 +835,20 @@ button {
   color: #f0d28a;
 }
 
+.setup-checklist {
+  background: #0c1014;
+  border: 1px solid #263039;
+  border-radius: 6px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.setup-checklist > strong {
+  color: #eef3f6;
+  font-size: 12px;
+}
+
 .github-box span,
 .github-box a,
 .runtime-plan span {

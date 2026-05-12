@@ -16,8 +16,15 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-note.md" })).toBeVisible();
 
     await page.getByLabel("Git").click();
+    const githubBox = page.locator(".github-box");
     await expect(page.getByText("Demo Source Control")).toBeVisible();
     await expect(page.getByText("実 GitHub repository には接続していません")).toBeVisible();
+    await expect(githubBox.getByText("実操作モード setup")).toBeVisible();
+    const setupItems = githubBox.locator(".setup-checklist li strong");
+    await expect(setupItems.filter({ hasText: "Worker connection" })).toBeVisible();
+    await expect(setupItems.filter({ hasText: "GitHub App credentials" })).toBeVisible();
+    await expect(setupItems.filter({ hasText: "Installation" })).toBeVisible();
+    await expect(setupItems.filter({ hasText: "Selected repository" })).toBeVisible();
     await expect(page.getByText("Branches")).toBeVisible();
     await expect(page.getByText("Merge readiness")).toBeVisible();
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
