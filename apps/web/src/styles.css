@@ -89,6 +89,28 @@ button {
   white-space: nowrap;
 }
 
+.titlebar-center .workspace-source-badge {
+  border-radius: 999px;
+  font-size: 11px;
+  max-width: 190px;
+}
+
+.workspace-source-github {
+  background: #101817 !important;
+  border-color: #28514a !important;
+  color: #dff7ea !important;
+}
+
+.workspace-source-local-directory {
+  background: #191711 !important;
+  border-color: #5a4a23 !important;
+  color: #f1dfaa !important;
+}
+
+.workspace-source-indexeddb {
+  background: #151a22 !important;
+}
+
 .titlebar-actions {
   display: flex;
   gap: 8px;
@@ -467,6 +489,11 @@ button {
 .source-mode-real {
   background: #101817;
   border-color: #28514a;
+}
+
+.source-mode-local {
+  background: #191711;
+  border-color: #5a4a23;
 }
 
 .branch-input {

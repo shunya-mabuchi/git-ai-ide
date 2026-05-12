@@ -478,6 +478,7 @@ export function App() {
   const selectedFileDirty = dirtyFiles.has(selectedFile);
   const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
   const selectedRepositoryOption = githubRepositories.find((repository) => repository.fullName === selectedRepository);
+  const localFolderMode = workspaceSource === "local-directory";
   const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
   const canOpenSelectedGitHubRepository = realGitHubMode && Boolean(selectedRepositoryOption?.installationId);
   const githubConnectionTitle = !githubConfigured
@@ -501,6 +502,8 @@ export function App() {
   const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "GitHub connection required";
   const sourceControlModeDetail = realGitHubMode
     ? "選択した GitHub repository に branch push / PR 作成を行います。"
+    : localFolderMode
+      ? "Local folder snapshot では GitHub branch / push / PR は利用できません。GitHub repository を開くと実操作できます。"
     : "GitHub App を接続するか、ローカルフォルダを開いて workspace を読み込んでください。未接続時は push / PR 作成を実行しません。";
   const githubOperationLabel = realGitHubMode ? "Real GitHub operation" : "Setup required";
   const githubSetupChecklist = useMemo(
@@ -1328,7 +1331,7 @@ export function App() {
       setBaselineFiles(result.files);
       setSavedFiles(result.files);
       setWorkspaceName(selectedRepositoryOption.fullName);
-      setWorkspaceSource("indexeddb");
+      setWorkspaceSource("github");
       setBranchName(selectedRepositoryOption.defaultBranch);
       setMergeTargetBranch(selectedRepositoryOption.defaultBranch);
       setSelectedFile(preferredFile);
@@ -1552,7 +1555,7 @@ export function App() {
       setCreatedPrUrl("");
       setWorkspaceRestored(false);
     } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : "repo を開けませんでした。");
+      setWorkspaceError(error instanceof Error ? error.message : "ローカルフォルダを開けませんでした。");
     } finally {
       setIsOpeningWorkspace(false);
     }
@@ -1727,7 +1730,8 @@ export function App() {
           <span>{workspaceName}</span>
         </div>
         <div className="titlebar-center">
-        <span><GitBranch size={14} /> {branchName}</span>
+          <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
+          <span><GitBranch size={14} /> {branchName}</span>
           <span>{extractMarkdownTitle(branchGoalMarkdown) || "Branch Goal"}</span>
           <span><ShieldCheck size={14} /> {safetyStatus}</span>
         </div>
@@ -1785,7 +1789,7 @@ export function App() {
                         disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
                         onClick={openLocalWorkspace}
                       >
-                        {isOpeningWorkspace ? "読み込み中" : "ローカル repo を開く"}
+                        {isOpeningWorkspace ? "読み込み中" : "ローカルフォルダを開く"}
                       </button>
                     </div>
                     <div className="file-operation-panel">
@@ -1912,6 +1916,12 @@ export function App() {
                     <strong>{sourceControlModeLabel}</strong>
                     <span>{sourceControlModeDetail}</span>
                   </div>
+                  {localFolderMode ? (
+                    <div className="source-mode source-mode-local">
+                      <strong>Local folder snapshot</strong>
+                      <span>この workspace はブラウザに読み込んだ snapshot です。Branch 作成、Push、PR 作成、Close issue は GitHub repository を開いた場合のみ利用できます。</span>
+                    </div>
+                  ) : null}
                   <div className="git-summary">
                     <span><GitBranch size={14} /> {gitStatus.branch}</span>
                     <strong>{sourceControlSummary}</strong>
@@ -1925,7 +1935,7 @@ export function App() {
                     <button className="button secondary" disabled={!realGitHubMode || isLoadingRemoteGit} onClick={() => void refreshRemoteGit()}>
                       {isLoadingRemoteGit ? "Loading" : "Remote 更新"}
                     </button>
-                    <button className="button secondary" disabled={!realGitHubMode || !branchName.trim() || isCreatingBranch} onClick={createRemoteBranch}>
+                    <button className="button secondary" disabled={!realGitHubMode || localFolderMode || !branchName.trim() || isCreatingBranch} onClick={createRemoteBranch}>
                       {isCreatingBranch ? "作成中" : "Branch 作成"}
                     </button>
                   </div>
@@ -2031,10 +2041,10 @@ export function App() {
                     <button className="button secondary" disabled={!gitStatus.hasChanges} onClick={createCommitDraft}>
                       Commit draft
                     </button>
-                    <button className="button secondary" disabled={!realGitHubMode || !commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
+                    <button className="button secondary" disabled={!realGitHubMode || localFolderMode || !commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
                       {isPushingBranch ? "Pushing" : "Push"}
                     </button>
-                    <button className="button" disabled={!realGitHubMode || !safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
+                    <button className="button" disabled={!realGitHubMode || localFolderMode || !safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
                       {isCreatingPr ? "作成中" : "PR 作成"}
                     </button>
                   </div>
@@ -2045,8 +2055,12 @@ export function App() {
                     </div>
                     {!realGitHubMode ? (
                       <div className="setup-warning">
-                        <strong>実 GitHub repository に接続してください</strong>
-                        <span>GitHub App を selected repository に install すると、branch 作成、push、PR 作成をこの UI から実行できます。</span>
+                        <strong>{localFolderMode ? "Local folder snapshot では GitHub 操作は無効です" : "実 GitHub repository に接続してください"}</strong>
+                        <span>
+                          {localFolderMode
+                            ? "Branch 作成、Push、PR 作成、Close issue は GitHub repository を開いた場合のみ利用できます。"
+                            : "GitHub App を selected repository に install すると、branch 作成、push、PR 作成をこの UI から実行できます。"}
+                        </span>
                       </div>
                     ) : null}
                     <div className="setup-checklist">
@@ -2112,6 +2126,7 @@ export function App() {
                     <label className="repo-select">
                       <span>Close issue</span>
                       <input
+                        disabled={!realGitHubMode || localFolderMode}
                         inputMode="numeric"
                         placeholder="例: 72"
                         value={closeIssueNumber}
@@ -2358,7 +2373,7 @@ export function App() {
                     disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
                     onClick={openLocalWorkspace}
                   >
-                    {isOpeningWorkspace ? "読み込み中" : "ローカル repo を開く"}
+                    {isOpeningWorkspace ? "読み込み中" : "ローカルフォルダを開く"}
                   </button>
                   {githubInstallUrl ? (
                     <a className="button secondary" href={githubInstallUrl} rel="noreferrer" target="_blank">
@@ -3095,7 +3110,8 @@ function createDirtyFileSet(savedFiles: Record<string, string>, workingFiles: Re
 
 function workspaceSourceLabel(source: WorkspaceSnapshot["source"]) {
   if (source === "empty") return "No Workspace";
-  if (source === "local-directory") return "Local Directory";
+  if (source === "github") return "GitHub repository";
+  if (source === "local-directory") return "Local folder snapshot";
   if (source === "indexeddb") return "Browser Snapshot";
   return "Test Fixture";
 }

@@ -43,8 +43,13 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByText("Branches")).toBeVisible();
     await expect(page.getByText("Merge readiness")).toBeVisible();
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
-    await page.getByLabel("Close issue").fill("72");
-    await expect(page.getByLabel("Close issue")).toHaveValue("72");
+    const closeIssueInput = page.getByLabel("Close issue");
+    if (await closeIssueInput.isEnabled()) {
+      await closeIssueInput.fill("72");
+      await expect(closeIssueInput).toHaveValue("72");
+    } else {
+      await expect(page.getByText("実 GitHub repository に接続してください")).toBeVisible();
+    }
     await expect(page.getByRole("button", { name: /e2e-note\.md added/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /e2e-folder\/\.gitkeep added/ })).toBeVisible();
 

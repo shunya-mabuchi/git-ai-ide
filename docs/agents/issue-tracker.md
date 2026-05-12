@@ -17,6 +17,33 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-049: Local folder snapshot と GitHub repository workflow の境界を明確にする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/101
+- 背景: ローカル folder は本物の Git working tree として操作しているのではなく、ブラウザに読み込んだ snapshot workspace。ローカル対象を repo と呼ぶ文言や GitHub 操作との混在は誤解を生むため、GitHub repository workflow と Local folder snapshot の境界を UI と読み込み処理で明確にする。
+- スコープ:
+  - ローカル対象の文言を `ローカルフォルダ` に変更する
+  - workspace source badge を追加する
+  - Local folder snapshot では Branch 作成 / Push / PR 作成 / Close issue が使えない理由を表示する
+  - local folder open に default ignore / binary / size guard を入れる
+  - `.gitignore` の簡易解釈を追加する
+- 受け入れ条件:
+  - UI で GitHub repository / Local folder snapshot / Browser snapshot が区別できる
+  - ローカルフォルダでは GitHub 操作が disabled で理由が表示される
+  - `.git`, `node_modules`, `dist`, `build`, `.next`, `coverage`, binary, large files が読み込み対象から外れる
+  - root `.gitignore` の基本 pattern が読み込み対象に反映される
+  - typecheck / build / E2E が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps\web\node_modules\.bin\vitest.CMD run` 成功
+  - `apps\web\node_modules\.bin\vite.CMD build` 成功
+  - `apps\web\node_modules\.bin\playwright.CMD test` 成功
+  - Browser smoke で `ローカルフォルダを開く` と workspace source badge が表示され、旧ローカル呼称が出ないことを確認
+  - 旧ローカル呼称の検索で該当なし
+
 ## GAI-048: GitHub App 接続後の repository open flow を分かりやすくする
 
 - 状態: 完了
