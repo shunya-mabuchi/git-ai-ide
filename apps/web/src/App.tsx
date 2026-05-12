@@ -147,6 +147,8 @@ const defaultWebLlmDeviceProfile: WebLlmDeviceProfile = {
   webGpuAvailable: false,
 };
 
+const webLlmFailedModelsStorageKey = "git-ai-ide.webllm.failed-models";
+
 const emptyPatchProposal: PatchProposal = {
   edits: [
     {
@@ -221,7 +223,7 @@ export function App() {
   const [runtimeLog, setRuntimeLog] = useState(fixtureTestLogIdle);
   const [previewRunState, setPreviewRunState] = useState<"idle" | "running" | "ready">("idle");
   const [previewLog, setPreviewLog] = useState("Local Preview はまだ起動していません。");
-  const [previewMode, setPreviewMode] = useState<"candidate" | "recorded" | "webcontainer">("candidate");
+  const [previewMode, setPreviewMode] = useState<"candidate" | "manual" | "webcontainer">("candidate");
   const [previewTabOpen, setPreviewTabOpen] = useState(false);
   const [editorView, setEditorView] = useState<EditorView>("file");
   const [previewUrl, setPreviewUrl] = useState("");
@@ -268,6 +270,7 @@ export function App() {
   const [webLlmDiagnosticLog, setWebLlmDiagnosticLog] = useState("WebLLM 実モデルロード診断はまだ実行していません。");
   const [webLlmDeviceProfile, setWebLlmDeviceProfile] = useState<WebLlmDeviceProfile>(defaultWebLlmDeviceProfile);
   const [selectedWebLlmModelId, setSelectedWebLlmModelId] = useState("Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC");
+  const [failedWebLlmModelIds, setFailedWebLlmModelIds] = useState<Set<string>>(() => loadFailedWebLlmModelIds());
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
@@ -702,25 +705,29 @@ export function App() {
     () =>
       rankWebLlmModels({
         device: webLlmDeviceProfile,
+        failedModelIds: failedWebLlmModelIds,
         task: webLlmTask,
         verifiedModelIds: new Set(),
       }),
-    [webLlmDeviceProfile, webLlmTask],
+    [failedWebLlmModelIds, webLlmDeviceProfile, webLlmTask],
   );
   const visibleWebLlmModels = rankedWebLlmModels.filter((model) => model.visibility !== "hidden").slice(0, 4);
+  const hiddenFailedWebLlmModelCount = rankedWebLlmModels.filter((model) => model.compatibility === "failed_on_device").length;
   const recommendedWebLlmModel = rankedWebLlmModels.find((model) => model.visibility === "recommended") ?? rankedWebLlmModels[0];
   const selectedRuntimeLabel = runtimeLabels[aiRuntimeMode];
   const selectedRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === aiRuntimeMode);
   const selectedRuntimeAvailable = aiRuntimeMode === "webllm" && selectedRuntimeHealth?.status === "available";
   useEffect(() => {
     if (!recommendedWebLlmModel) return;
-    setSelectedWebLlmModelId((current) => (current ? current : recommendedWebLlmModel.id));
-  }, [recommendedWebLlmModel]);
+    setSelectedWebLlmModelId((current) =>
+      current && visibleWebLlmModels.some((model) => model.id === current) ? current : recommendedWebLlmModel.id,
+    );
+  }, [recommendedWebLlmModel, visibleWebLlmModels]);
   const runtimePlan = useMemo(() => planRuntimeFromPackageJson(files), [files]);
   const previewPreflight = useMemo(
     () =>
       createLocalPreviewPreflight(runtimePlan, {
-        forceRecorded: false,
+        forceManual: false,
       }),
     [forceWebContainerPreview, runtimePlan, workspaceSource],
   );
@@ -961,6 +968,16 @@ export function App() {
 
     const result = await runWebLlmSmokeTest({ modelId: selectedWebLlmModelId });
     setWebLlmDiagnosticLog(result.log);
+    setFailedWebLlmModelIds((current) => {
+      const next = new Set(current);
+      if (result.mode === "webllm") {
+        next.delete(result.modelId);
+      } else if (webLlmDeviceProfile.webGpuAvailable) {
+        next.add(result.modelId);
+      }
+      saveFailedWebLlmModelIds(next);
+      return next;
+    });
     setAiRuntimeMode("webllm");
     setWebLlmDiagnosticState("idle");
   };
@@ -1354,7 +1371,7 @@ export function App() {
     setPreviewLog("Git AI IDE Local Preview\npreview を起動中...");
 
     const result = await startLocalPreview(files, runtimePlan, {
-      forceRecorded: false,
+      forceManual: false,
     });
     setPreviewLog(result.log);
     setPreviewMode(result.mode);
@@ -2260,7 +2277,7 @@ export function App() {
                   <div className="preview-info">
                     <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
                     <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
-                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Manual fallback" : previewPreflight.canAttemptWebContainer ? "WebContainer candidate" : "Manual fallback"}</span>
+                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "manual" ? "Manual fallback" : previewPreflight.canAttemptWebContainer ? "WebContainer candidate" : "Manual fallback"}</span>
                     <span>{previewPreflight.reason}</span>
                     {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
                     <ul className="preview-preflight">
@@ -2402,6 +2419,7 @@ export function App() {
                     <span>task: {webLlmTask} / 端末: {webLlmDeviceProfile.tier}</span>
                     <span>{webLlmDeviceProfile.adapterDetail}</span>
                     <span>storage: {formatBytes(webLlmDeviceProfile.storageQuota)}</span>
+                    {hiddenFailedWebLlmModelCount > 0 ? <span>{hiddenFailedWebLlmModelCount} 件はこの端末で load 失敗済みのため非表示</span> : null}
                   </div>
                   <div className="model-cards">
                     {visibleWebLlmModels.map((model) => (
@@ -2586,7 +2604,7 @@ function LocalPreviewPanel({
   previewAddress: string;
   previewCommand: string | undefined;
   previewLog: string;
-  previewMode: "candidate" | "recorded" | "webcontainer";
+  previewMode: "candidate" | "manual" | "webcontainer";
   previewPreflight: ReturnType<typeof createLocalPreviewPreflight>;
   previewRunState: "idle" | "running" | "ready";
   previewUrl: string;
@@ -2968,7 +2986,7 @@ function suggestRuntimeMode(input: {
     return "webllm";
   }
 
-  return "recorded";
+  return "webllm";
 }
 
 function runtimeCardClassName(
@@ -2996,6 +3014,25 @@ function estimateTokens(text: string) {
 function formatTokenCount(value: number) {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
+}
+
+function loadFailedWebLlmModelIds() {
+  if (typeof window === "undefined") return new Set<string>();
+
+  try {
+    const raw = window.localStorage.getItem(webLlmFailedModelsStorageKey);
+    if (!raw) return new Set<string>();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set<string>();
+    return new Set(parsed.filter((value): value is string => typeof value === "string"));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveFailedWebLlmModelIds(modelIds: Set<string>) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(webLlmFailedModelsStorageKey, JSON.stringify([...modelIds]));
 }
 
 function normalizeIssueNumber(value: string) {
@@ -3113,13 +3150,13 @@ function extractMarkdownTitle(markdown: string) {
 
 const runtimeLabels: Record<AiRuntimeMode, string> = {
   ollama: "Ollama",
-  recorded: "Test fixture",
+  recorded: "Fallback proposal",
   webllm: "WebLLM",
 };
 
 const runtimeDescriptions: Record<AiRuntimeMode, string> = {
   ollama: "ローカル常駐モデルで重い判断を担当",
-  recorded: "テスト用の固定 proposal",
+  recorded: "テスト fixture または緊急時の固定 proposal",
   webllm: "ブラウザ内で小さな判断を担当",
 };
 

@@ -78,7 +78,7 @@ pnpm --filter @git-ai-ide/web test:e2e
 - API / GitHub proxy: Cloudflare Workers
 - Metadata DB: Cloudflare D1
 - AI inference: WebLLM
-- Test fixture: deterministic proposal injection for UI regression
+- Test fixture: deterministic proposal injection for E2E regression only
 
 サーバー側で有料 LLM API を呼ばないため、公開後に利用者数が増えても LLM API コストが発生しにくい構成です。詳しくは [デプロイ手順](docs/deployment.md) を参照してください。
 
@@ -110,6 +110,7 @@ pnpm --filter @git-ai-ide/web test:e2e
 4. WebContainer は Local Preview の主軸だが万能ではないため、best-effort として preflight、fallback reason、diagnostics を UI に出した
 5. Cloudflare Pages / Workers / D1 に寄せ、無料公開と backend 境界を両立した
 6. Demo mode を user-facing UX から外し、実 repo 接続を前提にした
+7. WebLLM model は端末性能と task で絞り、load 失敗済みの model は次回候補から外す
 
 ## ドキュメント
 

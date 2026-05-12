@@ -1,7 +1,7 @@
 import type { RuntimePlan } from "@git-ai-ide/shared";
 import type { FileSystemTree, WebContainer, WebContainerProcess } from "@webcontainer/api";
 
-export type RuntimeRunMode = "webcontainer" | "recorded";
+export type RuntimeRunMode = "webcontainer" | "manual";
 
 export type RuntimeRunResult = {
   log: string;
@@ -39,11 +39,11 @@ let previewProcess: WebContainerProcess | undefined;
 
 export async function runRuntimeChecks(files: Record<string, string>, plan: RuntimePlan): Promise<RuntimeRunResult> {
   if (plan.capability !== "webcontainer") {
-    return runRecordedChecks(plan, "WebContainer 対象の JavaScript / TypeScript project として検出されませんでした。");
+    return runManualChecks(plan, "WebContainer 対象の JavaScript / TypeScript project として検出されませんでした。");
   }
 
   if (!canUseWebContainer()) {
-    return runRecordedChecks(
+    return runManualChecks(
       plan,
       "このブラウザ環境では WebContainer に必要な cross-origin isolation が有効ではありません。",
     );
@@ -82,7 +82,7 @@ export async function runRuntimeChecks(files: Record<string, string>, plan: Runt
       ok: true,
     };
   } catch (error) {
-    return runRecordedChecks(
+    return runManualChecks(
       plan,
       error instanceof Error ? `WebContainer 実行に失敗しました: ${error.message}` : "WebContainer 実行に失敗しました。",
     );
@@ -95,18 +95,18 @@ export function canUseWebContainer() {
 
 export function createLocalPreviewPreflight(
   plan: RuntimePlan,
-  options: { canUseWebContainer?: boolean; forceRecorded?: boolean } = {},
+  options: { canUseWebContainer?: boolean; forceManual?: boolean } = {},
 ): LocalPreviewPreflight {
   const previewCommand = plan.devCommand ?? plan.previewCommand;
   const browserReady = options.canUseWebContainer ?? canUseWebContainer();
   const items: LocalPreviewPreflightItem[] = [
     {
-      detail: options.forceRecorded
+      detail: options.forceManual
         ? "Test fixture は WebContainer を起動せずに確認します。"
         : "実 repo では WebContainer preview を best-effort で試します。native module / private registry / Docker / backend dependency が必要な repo は fallback します。",
       id: "source",
       label: "Workspace source",
-      status: options.forceRecorded ? "warning" : "pass",
+      status: options.forceManual ? "warning" : "pass",
     },
     {
       detail:
@@ -134,14 +134,14 @@ export function createLocalPreviewPreflight(
   ];
 
   const blocked = items.find((item) => item.status === "blocked");
-  const forced = options.forceRecorded;
+  const forced = options.forceManual;
   const canAttemptWebContainer = !forced && !blocked;
 
   return {
     canAttemptWebContainer,
     command: previewCommand,
     items,
-    mode: canAttemptWebContainer ? "webcontainer" : "recorded",
+    mode: canAttemptWebContainer ? "webcontainer" : "manual",
     reason: forced ? items[0].detail : blocked?.detail ?? "WebContainer dev server URL を iframe に best-effort で接続します。",
   };
 }
@@ -149,21 +149,21 @@ export function createLocalPreviewPreflight(
 export async function startLocalPreview(
   files: Record<string, string>,
   plan: RuntimePlan,
-  options: { forceRecorded?: boolean } = {},
+  options: { forceManual?: boolean } = {},
 ): Promise<LocalPreviewResult> {
   const preflight = createLocalPreviewPreflight(plan, {
-    forceRecorded: options.forceRecorded,
+    forceManual: options.forceManual,
   });
   const previewCommand = preflight.command;
 
   if (!preflight.canAttemptWebContainer) {
-    return runRecordedPreview(plan, preflight);
+    return runManualPreview(plan, preflight);
   }
 
   if (!previewCommand) {
-    return runRecordedPreview(plan, {
+    return runManualPreview(plan, {
       ...preflight,
-      mode: "recorded",
+      mode: "manual",
       reason: "dev / preview script が見つかりません。",
     });
   }
@@ -206,11 +206,11 @@ export async function startLocalPreview(
       url,
     };
   } catch (error) {
-    return runRecordedPreview(
+    return runManualPreview(
       plan,
       {
         ...preflight,
-        mode: "recorded",
+        mode: "manual",
         reason:
           error instanceof Error ? `WebContainer preview に失敗しました: ${error.message}` : "WebContainer preview に失敗しました。",
       },
@@ -305,7 +305,7 @@ function cleanTerminalOutput(data: string) {
     .trimEnd();
 }
 
-function runRecordedChecks(plan: RuntimePlan, reason: string): RuntimeRunResult {
+function runManualChecks(plan: RuntimePlan, reason: string): RuntimeRunResult {
   return {
     log: [
       "Git AI IDE Runtime",
@@ -318,12 +318,12 @@ function runRecordedChecks(plan: RuntimePlan, reason: string): RuntimeRunResult 
       "",
       "Runtime checks were not executed in this browser environment.",
     ].join("\n"),
-    mode: "recorded",
+    mode: "manual",
     ok: true,
   };
 }
 
-function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight): LocalPreviewResult {
+function runManualPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight): LocalPreviewResult {
   const previewCommand = plan.devCommand ?? plan.previewCommand;
 
   return {
@@ -345,7 +345,7 @@ function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight)
         ? "対応環境では WebContainer dev server URL を iframe に best-effort で接続します。失敗時は理由を表示し、URL bar fallback に切り替えます。"
         : "dev / preview script を追加すると Local Preview の候補になります。",
     ].join("\n"),
-    mode: "recorded",
+    mode: "manual",
     ok: Boolean(previewCommand),
     preflight,
   };

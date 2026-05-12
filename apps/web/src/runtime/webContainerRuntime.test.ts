@@ -72,7 +72,7 @@ describe("createLocalPreviewPreflight", () => {
 
     expect(preflight).toMatchObject({
       canAttemptWebContainer: false,
-      mode: "recorded",
+      mode: "manual",
     });
     expect(preflight.items.find((item) => item.id === "browser")).toMatchObject({
       status: "blocked",

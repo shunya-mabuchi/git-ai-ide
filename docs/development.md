@@ -65,7 +65,7 @@ ollama pull qwen2.5-coder:7b
 OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-ide/ai-runtime test:ollama-real
 ```
 
-Ollama 未起動の通常環境では `mode: recorded` と fallback reason を表示して終了します。
+Ollama 未起動の通常環境では legacy fallback と理由を表示して終了します。
 実 runtime を必須にしたい場合だけ、次のようにします。
 
 ```bash
@@ -91,7 +91,7 @@ WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model R
 Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC
 ```
 
-Model Routing は WebGPU adapter、推定 storage quota、task priority、branch 状態から候補を絞ります。端末に合わない model は通常候補から外し、実 load に失敗した model は次回以降の候補から下げる設計です。
+Model Routing は WebGPU adapter、推定 storage quota、task priority、branch 状態から候補を絞ります。端末に合わない model は通常候補から外し、実 load に失敗した model は次回以降の候補から非表示にします。
 
 初回は model download と cache に時間がかかります。WebLLM の公式 docs では `CreateMLCEngine()` で model を読み込み、OpenAI 互換の `chat.completions.create()` で completion を実行します。
 

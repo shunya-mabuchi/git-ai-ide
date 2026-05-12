@@ -17,6 +17,35 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-046: 公開前にローカルで可能な runtime / docs / smoke を固める
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:runtime`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/95
+- 背景: 本番公開前に、deploy なしで潰せる runtime UX、WebLLM model routing、WebContainer fallback、docs、smoke test を固める。
+- スコープ:
+  - WebLLM load 失敗 model を端末ごとに記録し、次回候補から外す
+  - WebContainer fallback の internal naming を user-facing な manual fallback に寄せる
+  - WebLLM / WebContainer の診断テストを追加する
+  - WebLLM runtime を明示 chunk に分割し、build log の意図を明確にする
+  - README / docs の公開前表現を整理する
+  - typecheck / unit test / build / E2E / smoke を確認する
+- 受け入れ条件:
+  - 通常 UI で Demo mode を主機能のように見せない
+  - WebLLM 失敗 model が次回候補から外れる
+  - WebContainer 非対応時の理由が manual fallback として分かる
+  - 公開前 docs の残タスクが現状と一致する
+  - 主要検証コマンドが通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `packages\shared\node_modules\.bin\vitest.CMD run` 成功
+  - `packages\ai-runtime\node_modules\.bin\vitest.CMD run` 成功
+  - `apps\web\node_modules\.bin\vitest.CMD run` 成功
+  - `apps\web\node_modules\.bin\vite.CMD build` 成功
+  - `apps\web\node_modules\.bin\playwright.CMD test` 成功
+  - browser smoke で通常起動に repository 接続導線が表示され、Demo Source Control / Demo repository が表示されないことを確認
+
 ## GAI-040: Web UI の GitHub real flow と error UX を完成させる
 
 - 状態: 完了
