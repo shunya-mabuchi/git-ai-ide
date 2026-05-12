@@ -1165,9 +1165,31 @@ button {
 }
 
 .preview-panel {
-  display: block;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: 34px minmax(0, 1fr);
   min-height: 100%;
   padding: 10px;
+}
+
+.preview-addressbar {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.preview-addressbar input {
+  background: #0c1014;
+  border: 1px solid #2a2f36;
+  border-radius: 6px;
+  color: #d6dee6;
+  font: inherit;
+  font-size: 12px;
+  height: 32px;
+  min-width: 0;
+  padding: 0 10px;
 }
 
 .preview-info,
