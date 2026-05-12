@@ -4,7 +4,9 @@ test.describe("Git AI IDE workflow", () => {
   test("通常起動では repo 接続導線を表示する", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByText("Repository を開いてください")).toBeVisible();
+    await expect(page.getByText(/GitHub App をインストールしてください|GitHub repository を開けます|GitHub repository を選択してください/)).toBeVisible();
+    await expect(page.getByText("Only select repositories")).toBeVisible();
+    await expect(page.getByRole("button", { name: "この repo を開く" })).toBeVisible();
     await expect(page.getByText("Demo Source Control")).toHaveCount(0);
     await expect(page.getByText("Demo repository")).toHaveCount(0);
   });
