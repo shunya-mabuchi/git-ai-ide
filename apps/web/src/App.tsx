@@ -30,7 +30,7 @@ import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPack
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
 import { evaluatePullRequestFlow, evaluateSafetyGate, type ContextPack, type PatchProposal } from "@git-ai-ide/shared";
-import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
+import { demoFiles, demoPatch } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
   createGitHubBranch,
@@ -73,7 +73,7 @@ type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
 type VisibleAiRuntimeMode = Exclude<AiRuntimeMode, "ollama">;
-type PatchQueueSource = "demo" | "ai";
+type PatchQueueSource = "fixture" | "ai";
 
 type PatchQueueItem = {
   failureReason?: string;
@@ -140,18 +140,38 @@ const aiMessages = [
   },
 ];
 
-const demoGitHubRepository: GitHubRepositoryOption = {
-  defaultBranch: "main",
-  fullName: "demo/pr-helper-mini",
-  name: "pr-helper-mini",
-  owner: "demo",
-};
-
 const defaultWebLlmDeviceProfile: WebLlmDeviceProfile = {
   adapterDetail: "WebGPU device 診断はまだ実行していません。",
   crossOriginIsolated: false,
   tier: "none",
   webGpuAvailable: false,
+};
+
+const emptyPatchProposal: PatchProposal = {
+  edits: [
+    {
+      file: "",
+      find: "",
+      operation: "replace",
+      reason: "WebLLM から proposal を生成するまで diff はありません。",
+      replacement: "",
+    },
+  ],
+  id: "no-patch-proposal",
+  safety: {
+    branchGoalAttached: false,
+    contextPackReviewed: false,
+    diffPreviewGenerated: false,
+    gitDiffUpdated: false,
+    modelCapabilityAccepted: false,
+    structuredEditParsed: false,
+    targetFileExists: false,
+    targetTextMatched: false,
+    testsRun: false,
+  },
+  status: "needs_attention",
+  summary: "WebLLM が利用可能になったら、選択中の file と Branch Goal から structured edit proposal を生成します。",
+  title: "Patch proposal はまだありません",
 };
 
 export function App() {
@@ -160,22 +180,30 @@ export function App() {
     if (typeof window === "undefined") return false;
     return new URLSearchParams(window.location.search).get("preview") === "webcontainer";
   }, []);
-  const [selectedFile, setSelectedFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
-  const [openFiles, setOpenFiles] = useState<FileName[]>(["src/features/pr-summary/generateSummary.ts"]);
+  const testFixtureEnabled = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("fixture") === "demo";
+  }, []);
+  const initialFile = testFixtureEnabled ? "src/features/pr-summary/generateSummary.ts" : "";
+  const initialFiles = testFixtureEnabled ? demoFiles : {};
+  const [selectedFile, setSelectedFile] = useState<FileName>(initialFile);
+  const [openFiles, setOpenFiles] = useState<FileName[]>(initialFile ? [initialFile] : []);
   const [editorTarget, setEditorTarget] = useState<{ file: FileName; line: number } | null>(null);
-  const [files, setFiles] = useState<Record<string, string>>(demoFiles);
-  const [baselineFiles, setBaselineFiles] = useState<Record<string, string>>(demoFiles);
-  const [savedFiles, setSavedFiles] = useState<Record<string, string>>(demoFiles);
-  const [workspaceName, setWorkspaceName] = useState("PR Helper Mini");
-  const [workspaceSource, setWorkspaceSource] = useState<WorkspaceSnapshot["source"]>("demo");
+  const [files, setFiles] = useState<Record<string, string>>(initialFiles);
+  const [baselineFiles, setBaselineFiles] = useState<Record<string, string>>(initialFiles);
+  const [savedFiles, setSavedFiles] = useState<Record<string, string>>(initialFiles);
+  const [workspaceName, setWorkspaceName] = useState(testFixtureEnabled ? "PR Helper Mini" : "No workspace");
+  const [workspaceSource, setWorkspaceSource] = useState<WorkspaceSnapshot["source"]>(testFixtureEnabled ? "demo" : "empty");
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
   const [workspaceRestored, setWorkspaceRestored] = useState(false);
   const [patchApplied, setPatchApplied] = useState(false);
-  const [patchQueue, setPatchQueue] = useState<PatchQueueItem[]>([{ proposal: demoPatch, source: "demo" }]);
-  const [activePatchId, setActivePatchId] = useState(demoPatch.id);
+  const [patchQueue, setPatchQueue] = useState<PatchQueueItem[]>(testFixtureEnabled ? [{ proposal: demoPatch, source: "fixture" }] : []);
+  const [activePatchId, setActivePatchId] = useState(testFixtureEnabled ? demoPatch.id : emptyPatchProposal.id);
   const [patchGenerationState, setPatchGenerationState] = useState<"idle" | "running">("idle");
-  const [patchGenerationMessage, setPatchGenerationMessage] = useState("Recorded AI demo patch を読み込み済みです。");
+  const [patchGenerationMessage, setPatchGenerationMessage] = useState(
+    testFixtureEnabled ? "Test fixture patch を読み込み済みです。" : "WebLLM を使って patch proposal を生成してください。",
+  );
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffMode, setDiffMode] = useState<DiffMode>("patch");
   const [diffFile, setDiffFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
@@ -190,7 +218,7 @@ export function App() {
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(false);
   const [testsRun, setTestsRun] = useState(false);
   const [runtimeRunState, setRuntimeRunState] = useState<"idle" | "running">("idle");
-  const [runtimeLog, setRuntimeLog] = useState(demoTestLogIdle);
+  const [runtimeLog, setRuntimeLog] = useState(fixtureTestLogIdle);
   const [previewRunState, setPreviewRunState] = useState<"idle" | "running" | "ready">("idle");
   const [previewLog, setPreviewLog] = useState("Local Preview はまだ起動していません。");
   const [previewMode, setPreviewMode] = useState<"candidate" | "recorded" | "webcontainer">("candidate");
@@ -201,13 +229,15 @@ export function App() {
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [prDraftMarkdown, setPrDraftMarkdown] = useState("");
-  const [branchName, setBranchName] = useState("feature/pr-summary");
-  const [branchGoalMarkdown, setBranchGoalMarkdown] = useState(demoBranchGoal.markdown);
+  const [branchName, setBranchName] = useState("feature/change");
+  const [branchGoalMarkdown, setBranchGoalMarkdown] = useState(
+    "# Branch Goal\n\n- 変更目的を書く\n- 確認したい挙動を書く\n- PR で閉じる issue があれば記録する\n",
+  );
   const [newFilePath, setNewFilePath] = useState("src/features/pr-summary/notes.md");
   const [newFolderPath, setNewFolderPath] = useState("src/features/pr-summary/docs");
   const [renameFilePath, setRenameFilePath] = useState("src/features/pr-summary/generateSummary.ts");
   const [mergeTargetBranch, setMergeTargetBranch] = useState("main");
-  const [conflictDemoEnabled, setConflictDemoEnabled] = useState(false);
+  const [conflictFixtureEnabled, setConflictFixtureEnabled] = useState(false);
   const [fileOperationMessage, setFileOperationMessage] = useState("選択中のファイルに対して作成・改名・削除できます。");
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
@@ -223,7 +253,7 @@ export function App() {
   const [githubBranches, setGithubBranches] = useState<GitHubBranchOption[]>([]);
   const [githubCommits, setGithubCommits] = useState<GitHubCommitOption[]>([]);
   const [githubSetupState, setGithubSetupState] = useState<GitHubSetupState>("checking");
-  const [selectedRepository, setSelectedRepository] = useState("demo/pr-helper-mini");
+  const [selectedRepository, setSelectedRepository] = useState("");
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
   const [isLoadingGitHubRepositories, setIsLoadingGitHubRepositories] = useState(false);
@@ -231,7 +261,7 @@ export function App() {
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [isPushingBranch, setIsPushingBranch] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
-  const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
+  const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("webllm");
   const [aiRuntimeStatus, setAiRuntimeStatus] = useState(createDefaultRuntimeStatus());
   const [aiRuntimeCheckState, setAiRuntimeCheckState] = useState<"checking" | "ready">("checking");
   const [webLlmDiagnosticState, setWebLlmDiagnosticState] = useState<"idle" | "running">("idle");
@@ -278,13 +308,13 @@ export function App() {
       .then((status) => {
         if (cancelled) return;
         setAiRuntimeStatus(status);
-        setAiRuntimeMode(status.recommendedProvider === "ollama" ? "webllm" : status.recommendedProvider);
+        setAiRuntimeMode("webllm");
         setAiRuntimeCheckState("ready");
       })
       .catch(() => {
         if (cancelled) return;
         setAiRuntimeStatus(createDefaultRuntimeStatus());
-        setAiRuntimeMode("recorded");
+        setAiRuntimeMode("webllm");
         setAiRuntimeCheckState("ready");
       });
 
@@ -316,11 +346,11 @@ export function App() {
         setGithubInstallUrl(setup.installUrl);
 
         if (!setup.appConfigured) {
-          const repositories = await loadGitHubRepositories();
-          if (cancelled) return;
-          applyGitHubRepositories(repositories);
+          setGithubRepositories([]);
+          setSelectedRepository("");
+          setSelectedInstallationId(undefined);
           setGithubSetupState("secrets-missing");
-          setGithubStatusMessage("Demo mode: GitHub secrets 未設定");
+          setGithubStatusMessage("GitHub App credentials 未設定");
           return;
         }
 
@@ -349,10 +379,12 @@ export function App() {
       })
       .catch(() => {
         if (cancelled) return;
-        applyGitHubRepositories([demoGitHubRepository]);
+        setGithubRepositories([]);
+        setSelectedRepository("");
+        setSelectedInstallationId(undefined);
         setIsLoadingGitHubRepositories(false);
         setGithubSetupState("worker-offline");
-        setGithubStatusMessage("Worker 未起動: demo mode fallback");
+        setGithubStatusMessage("Worker 未起動");
       });
 
     return () => {
@@ -363,9 +395,12 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
 
+    if (testFixtureEnabled) return;
+
     loadWorkspaceSnapshot()
       .then((snapshot) => {
         if (!snapshot || cancelled) return;
+        if (snapshot.source === "demo") return;
         setFiles(snapshot.files);
         setBaselineFiles(snapshot.files);
         setSavedFiles(snapshot.files);
@@ -385,9 +420,10 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [testFixtureEnabled]);
 
   useEffect(() => {
+    if (workspaceSource === "empty") return;
     void saveWorkspaceSnapshot({
       files,
       name: workspaceName,
@@ -438,17 +474,17 @@ export function App() {
   const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
   const selectedRepositoryOption = githubRepositories.find((repository) => repository.fullName === selectedRepository);
   const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
-  const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "Demo Source Control";
+  const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "GitHub connection required";
   const sourceControlModeDetail = realGitHubMode
     ? "選択した GitHub repository に branch push / PR 作成を行います。"
-    : "これはブラウザ内 snapshot と demo repository の simulation です。実 GitHub repo は変更されません。";
-  const githubOperationLabel = realGitHubMode ? "Real GitHub operation" : "Demo simulation";
+    : "GitHub App を接続するか、ローカルフォルダを開いて workspace を読み込んでください。未接続時は push / PR 作成を実行しません。";
+  const githubOperationLabel = realGitHubMode ? "Real GitHub operation" : "Setup required";
   const githubSetupChecklist = useMemo(
     () => [
       {
         detail:
           githubSetupState === "worker-offline"
-            ? "Cloudflare Worker に接続できないため demo fallback で表示しています。"
+            ? "Cloudflare Worker に接続できません。Worker を起動するか deploy URL を設定してください。"
             : githubSetupState === "checking"
               ? "GitHub Worker の setup state を確認中です。"
               : "GitHub Worker に接続できています。",
@@ -479,7 +515,7 @@ export function App() {
           ? `${selectedRepository} を実操作対象として選択中です。`
           : githubConfigured && selectedInstallationId
             ? "selected repository を読み込めていません。installation の権限を確認してください。"
-            : "demo/pr-helper-mini を simulation として表示しています。",
+            : "GitHub App の credentials / installation / repository を設定してください。",
         id: "repository",
         label: "Selected repository",
         status: realGitHubMode ? "pass" : githubConfigured && selectedInstallationId ? "blocked" : "warning",
@@ -504,7 +540,7 @@ export function App() {
         {
           ahead: 0,
           behind: 0,
-          label: realGitHubMode ? "base branch" : "demo base branch",
+          label: realGitHubMode ? "base branch" : "local base",
           name: "main",
           role: "base",
           status: branchName === "main" ? "current" : "ready",
@@ -512,7 +548,7 @@ export function App() {
         {
           ahead: commitCreated ? 1 : gitStatus.hasChanges ? 0 : branchPushed ? 1 : 0,
           behind: 0,
-          label: realGitHubMode ? "working branch" : "browser snapshot branch",
+          label: realGitHubMode ? "working branch" : "local working branch",
           name: branchName,
           role: "working",
           status: gitStatus.hasChanges ? "needs-work" : "current",
@@ -520,8 +556,8 @@ export function App() {
         {
           ahead: branchPushed ? 1 : 0,
           behind: branchPushed ? 0 : 1,
-          label: realGitHubMode ? "PR branch" : "demo PR branch preview",
-          name: realGitHubMode ? `${branchName}-review` : `${branchName}-demo-preview`,
+          label: realGitHubMode ? "PR branch" : "PR branch pending",
+          name: realGitHubMode ? `${branchName}-review` : branchName,
           role: "review",
           status: branchPushed ? "ready" : "needs-work",
         },
@@ -545,27 +581,27 @@ export function App() {
         ...(commitCreated
           ? [
               {
-                author: realGitHubMode ? "You + GitHub" : "You + Git AI IDE demo",
+                author: realGitHubMode ? "You + GitHub" : "local draft",
                 branch: branchName,
                 message: commitMessage.split("\n")[0] || "Improve PR summary generation",
                 sha: pushedCommitSha.slice(0, 7) || "local01",
-                time: branchPushed ? (realGitHubMode ? "pushed" : "demo pushed") : "local draft",
+                time: branchPushed ? "pushed" : "local draft",
               },
             ]
           : []),
         {
-          author: realGitHubMode ? "remote" : "demo fixture",
+          author: realGitHubMode ? "remote" : "local baseline",
           branch: "main",
           message: "Add PR summary generator",
           sha: "b41f7a2",
-          time: realGitHubMode ? "remote base" : "demo base",
+          time: realGitHubMode ? "remote base" : "baseline",
         },
         {
-          author: realGitHubMode ? "remote" : "demo fixture",
+          author: realGitHubMode ? "remote" : "local baseline",
           branch: "main",
           message: "Create typed summary contract",
           sha: "9c12d4e",
-          time: realGitHubMode ? "remote base" : "demo base",
+          time: realGitHubMode ? "remote base" : "baseline",
         },
       ];
     },
@@ -592,12 +628,12 @@ export function App() {
         status: previewRunState === "ready" ? "pass" : "warning",
       },
       {
-        detail: conflictDemoEnabled
-          ? "demo/main と同じ行を変更した想定です。解消方針を確認してください。"
+        detail: conflictFixtureEnabled
+          ? "test fixture で同じ行を変更した想定です。解消方針を確認してください。"
           : "既知の conflict はありません。",
         id: "conflict",
         label: "Conflict",
-        status: conflictDemoEnabled ? "blocked" : "pass",
+        status: conflictFixtureEnabled ? "blocked" : "pass",
       },
       {
         detail: branchPushed ? `${mergeTargetBranch} へ PR 作成可能です。` : "remote branch push 後に PR / merge へ進めます。",
@@ -606,16 +642,17 @@ export function App() {
         status: branchPushed ? "pass" : "warning",
       },
     ],
-    [branchPushed, conflictDemoEnabled, gitStatus.entries.length, gitStatus.hasChanges, mergeTargetBranch, previewRunState, testsRun],
+    [branchPushed, conflictFixtureEnabled, gitStatus.entries.length, gitStatus.hasChanges, mergeTargetBranch, previewRunState, testsRun],
   );
   const currentFile = files[selectedFile] ?? "";
-  const activePatchItem = patchQueue.find((item) => item.proposal.id === activePatchId) ?? patchQueue[0] ?? { proposal: demoPatch, source: "demo" };
+  const activePatchItem = patchQueue.find((item) => item.proposal.id === activePatchId) ?? patchQueue[0] ?? { proposal: emptyPatchProposal, source: "ai" };
   const activePatch = activePatchItem.proposal;
+  const hasActivePatchProposal = patchQueue.length > 0;
   const preview = useMemo(() => applyStructuredEdits(files, activePatch.edits), [activePatch.edits, files]);
-  const primaryEdit = activePatch.edits[0] ?? demoPatch.edits[0];
+  const primaryEdit = activePatch.edits[0] ?? emptyPatchProposal.edits[0];
   const patchTargetAvailable = Boolean(files[primaryEdit.file]);
   const activePatchRejected = activePatch.status === "rejected";
-  const canReviewPatch = patchTargetAvailable && !activePatchRejected;
+  const canReviewPatch = hasActivePatchProposal && patchTargetAvailable && !activePatchRejected;
   const canApplyPatch = canReviewPatch && preview.ok && !patchApplied;
   const patchFailureReason = activePatchItem.failureReason ?? (!preview.ok ? preview.error : "");
   const previewFile = preview.ok ? preview.files[primaryEdit.file] : undefined;
@@ -674,7 +711,7 @@ export function App() {
   const recommendedWebLlmModel = rankedWebLlmModels.find((model) => model.visibility === "recommended") ?? rankedWebLlmModels[0];
   const selectedRuntimeLabel = runtimeLabels[aiRuntimeMode];
   const selectedRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === aiRuntimeMode);
-  const selectedRuntimeAvailable = selectedRuntimeHealth?.status === "available";
+  const selectedRuntimeAvailable = aiRuntimeMode === "webllm" && selectedRuntimeHealth?.status === "available";
   useEffect(() => {
     if (!recommendedWebLlmModel) return;
     setSelectedWebLlmModelId((current) => (current ? current : recommendedWebLlmModel.id));
@@ -683,7 +720,7 @@ export function App() {
   const previewPreflight = useMemo(
     () =>
       createLocalPreviewPreflight(runtimePlan, {
-        forceRecorded: workspaceSource === "demo" && !forceWebContainerPreview,
+        forceRecorded: false,
       }),
     [forceWebContainerPreview, runtimePlan, workspaceSource],
   );
@@ -719,7 +756,7 @@ export function App() {
   );
   const runtimeDiagnostics = useMemo<RuntimeDiagnosticItem[]>(() => {
     const webllmHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "webllm");
-    const githubModeReady = githubConfigured ? Boolean(selectedInstallationId) : true;
+    const githubModeReady = githubConfigured && Boolean(selectedInstallationId);
     const webContainerBlocked = previewPreflight.items.find((item) => item.status === "blocked");
     const webContainerWarning = previewPreflight.items.find((item) => item.status === "warning");
 
@@ -729,7 +766,7 @@ export function App() {
           ? selectedInstallationId
             ? `${selectedRepository} の installation を選択済みです。`
             : "GitHub App mode では installation 選択が必要です。"
-          : "GitHub secrets 未設定のため demo mode で確認します。",
+          : "GitHub App credentials が未設定です。実 repo 操作には Worker secrets が必要です。",
         group: "github",
         id: "github-credentials",
         label: "GitHub App credentials",
@@ -842,9 +879,9 @@ export function App() {
     ],
   );
 
-  const resetPatchQueueToDemo = () => {
-    setPatchQueue([{ proposal: demoPatch, source: "demo" }]);
-    setActivePatchId(demoPatch.id);
+  const resetPatchQueue = () => {
+    setPatchQueue(testFixtureEnabled ? [{ proposal: demoPatch, source: "fixture" }] : []);
+    setActivePatchId(testFixtureEnabled ? demoPatch.id : emptyPatchProposal.id);
   };
 
   const queuePatchProposal = (proposal: PatchProposal, source: PatchQueueSource, failureReason?: string) => {
@@ -903,7 +940,7 @@ export function App() {
     queuePatchProposal(result.proposal, "ai", result.warnings.length ? result.warnings.join(" / ") : undefined);
     setPatchApplied(false);
     setTestsRun(false);
-    setRuntimeLog(demoTestLogIdle);
+    setRuntimeLog(fixtureTestLogIdle);
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
@@ -924,7 +961,7 @@ export function App() {
 
     const result = await runWebLlmSmokeTest({ modelId: selectedWebLlmModelId });
     setWebLlmDiagnosticLog(result.log);
-    setAiRuntimeMode(result.mode);
+    setAiRuntimeMode("webllm");
     setWebLlmDiagnosticState("idle");
   };
 
@@ -977,7 +1014,7 @@ export function App() {
 
   const resetWorkflowAfterFileOperation = () => {
     setTestsRun(false);
-    setRuntimeLog(demoTestLogIdle);
+    setRuntimeLog(fixtureTestLogIdle);
     setPreviewRunState("idle");
     setPreviewUrl("");
     setPrDraftGenerated(false);
@@ -1186,7 +1223,7 @@ export function App() {
     });
     setPatchApplied(true);
     setTestsRun(false);
-    setRuntimeLog(demoTestLogIdle);
+    setRuntimeLog(fixtureTestLogIdle);
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
@@ -1317,7 +1354,7 @@ export function App() {
     setPreviewLog("Git AI IDE Local Preview\npreview を起動中...");
 
     const result = await startLocalPreview(files, runtimePlan, {
-      forceRecorded: workspaceSource === "demo" && !forceWebContainerPreview,
+      forceRecorded: false,
     });
     setPreviewLog(result.log);
     setPreviewMode(result.mode);
@@ -1340,6 +1377,13 @@ export function App() {
   };
 
   const pushBranch = async () => {
+    if (!realGitHubMode) {
+      setGithubStatusMessage("GitHub App と selected repository を接続すると push できます。");
+      setBottomPanelMode("problems");
+      setBottomPanelCollapsed(false);
+      return;
+    }
+
     if (!commitCreated) {
       setBottomPanelMode("problems");
       setBottomPanelCollapsed(false);
@@ -1369,7 +1413,7 @@ export function App() {
       setPushedCommitSha(result.commit.sha ?? "");
       setBaselineFiles(files);
       setSavedFiles(files);
-      setGithubStatusMessage(result.mode === "github" ? "Branch pushed to GitHub" : "Demo branch pushed");
+      setGithubStatusMessage(result.mode === "github" ? "Branch pushed to GitHub" : "Branch push did not run against GitHub");
       setBottomPanelMode("output");
       setBottomPanelCollapsed(false);
     } catch (error) {
@@ -1399,10 +1443,10 @@ export function App() {
       setDiffFile(preferredFile);
       setDiffOpen(false);
       setPatchApplied(false);
-      resetPatchQueueToDemo();
-      setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
+      resetPatchQueue();
+      setPatchGenerationMessage("WebLLM を使って patch proposal を生成してください。");
       setTestsRun(false);
-      setRuntimeLog(demoTestLogIdle);
+      setRuntimeLog(fixtureTestLogIdle);
       setPreviewRunState("idle");
       setPreviewLog("Local Preview はまだ起動していません。");
       setPreviewMode("candidate");
@@ -1421,43 +1465,13 @@ export function App() {
     }
   };
 
-  const restoreDemoWorkspace = () => {
-    setFiles(demoFiles);
-    setBaselineFiles(demoFiles);
-    setSavedFiles(demoFiles);
-    setWorkspaceName("PR Helper Mini");
-    setWorkspaceSource("demo");
-    openFile("src/features/pr-summary/generateSummary.ts");
-    setOpenFiles(["src/features/pr-summary/generateSummary.ts"]);
-    setDiffFile("src/features/pr-summary/generateSummary.ts");
-    setDiffOpen(false);
-    setPatchApplied(false);
-    resetPatchQueueToDemo();
-    setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
-    setTestsRun(false);
-    setRuntimeLog(demoTestLogIdle);
-    setPreviewRunState("idle");
-    setPreviewLog("Local Preview はまだ起動していません。");
-    setPreviewMode("candidate");
-    setPreviewUrl("");
-    setPrDraftGenerated(false);
-    setBranchName("feature/pr-summary");
-    setCommitMessage("");
-    setCommitCreated(false);
-    setBranchPushed(false);
-    setPushedCommitSha("");
-    setCreatedPrUrl("");
-    setWorkspaceError(null);
-    setWorkspaceRestored(false);
-  };
-
   const updateCurrentFile = (value?: string) => {
     setFiles((currentFiles) => ({
       ...currentFiles,
       [selectedFile]: value ?? "",
     }));
     setTestsRun(false);
-    setRuntimeLog(demoTestLogIdle);
+    setRuntimeLog(fixtureTestLogIdle);
     setPrDraftGenerated(false);
     setCommitCreated(false);
     setBranchPushed(false);
@@ -1521,6 +1535,13 @@ export function App() {
   };
 
   const createPullRequest = async () => {
+    if (!realGitHubMode) {
+      setGithubStatusMessage("GitHub App と selected repository を接続すると PR を作成できます。");
+      setBottomPanelMode("problems");
+      setBottomPanelCollapsed(false);
+      return;
+    }
+
     if (!safetyGate.canCreatePullRequest || !branchPushed) {
       setBottomPanelMode("problems");
       setBottomPanelCollapsed(false);
@@ -1541,7 +1562,7 @@ export function App() {
       });
       setCreatedPrUrl(result.pullRequest.url);
       setGithubStatusMessage(
-        result.warning ?? (result.mode === "github" ? `GitHub PR created: #${result.pullRequest.number}` : "Demo PR created"),
+        result.warning ?? (result.mode === "github" ? `GitHub PR created: #${result.pullRequest.number}` : "PR creation did not run against GitHub"),
       );
       setBottomPanelMode("output");
       setBottomPanelCollapsed(false);
@@ -1614,7 +1635,7 @@ export function App() {
         </div>
         <div className="titlebar-center">
         <span><GitBranch size={14} /> {branchName}</span>
-          <span>{demoBranchGoal.title}</span>
+          <span>{extractMarkdownTitle(branchGoalMarkdown) || "Branch Goal"}</span>
           <span><ShieldCheck size={14} /> {safetyStatus}</span>
         </div>
         <div className="titlebar-actions">
@@ -1673,7 +1694,6 @@ export function App() {
                       >
                         {isOpeningWorkspace ? "読み込み中" : "ローカル repo を開く"}
                       </button>
-                      <button className="button ghost" onClick={restoreDemoWorkspace}>デモ repo</button>
                     </div>
                     <div className="file-operation-panel">
                       <label>
@@ -1697,11 +1717,11 @@ export function App() {
                         <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
                       </label>
                       <div className="file-operation-actions">
-                        <button className="icon-action" title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
+                        <button className="icon-action" disabled={!selectedFile} title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
                           <Pencil size={15} />
                           <span>改名</span>
                         </button>
-                        <button className="icon-action danger" title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
+                        <button className="icon-action danger" disabled={!selectedFile} title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
                           <Trash2 size={15} />
                           <span>削除</span>
                         </button>
@@ -1738,9 +1758,9 @@ export function App() {
                     <PanelTitle title="Repo Map" />
                     <div className="repo-map">
                       <span>{workspaceName} / {fileNames.length} files</span>
-                      <span>{demoRepoMap.detectedStack.join(" / ")}</span>
-                      <span>test: {demoRepoMap.commands.test}</span>
-                      <span>typecheck: {demoRepoMap.commands.typecheck}</span>
+                      <span>capability: {runtimePlan.capability}</span>
+                      <span>test: {runtimePlan.testCommand ?? "not detected"}</span>
+                      <span>typecheck: {runtimePlan.typecheckCommand ?? "not detected"}</span>
                     </div>
                   </section>
                 </>
@@ -1795,7 +1815,7 @@ export function App() {
               {sidePanelMode === "git" ? (
                 <section className="explorer-section">
                   <PanelTitle title="Source Control" />
-                  <div className={realGitHubMode ? "source-mode source-mode-real" : "source-mode source-mode-demo"}>
+                  <div className={realGitHubMode ? "source-mode source-mode-real" : "source-mode source-mode-setup"}>
                     <strong>{sourceControlModeLabel}</strong>
                     <span>{sourceControlModeDetail}</span>
                   </div>
@@ -1818,7 +1838,7 @@ export function App() {
                   </div>
                   <div className="branch-goal-card">
                     <span>Branch Goal</span>
-                    <strong>{extractMarkdownTitle(branchGoalMarkdown) || demoBranchGoal.title}</strong>
+                    <strong>{extractMarkdownTitle(branchGoalMarkdown) || "Branch Goal"}</strong>
                   </div>
                   <PanelTitle title="Branches" />
                   <div className="branch-list">
@@ -1847,10 +1867,12 @@ export function App() {
                       <span>Target</span>
                       <input value={mergeTargetBranch} onChange={(event) => setMergeTargetBranch(event.target.value)} />
                     </label>
-                    <button className="icon-action" onClick={() => setConflictDemoEnabled((enabled) => !enabled)}>
-                      <Merge size={15} />
-                      <span>{conflictDemoEnabled ? "競合デモ解除" : "競合デモ"}</span>
-                    </button>
+                    {testFixtureEnabled ? (
+                      <button className="icon-action" onClick={() => setConflictFixtureEnabled((enabled) => !enabled)}>
+                        <Merge size={15} />
+                        <span>{conflictFixtureEnabled ? "fixture 競合解除" : "fixture 競合"}</span>
+                      </button>
+                    ) : null}
                     <ul className="readiness-list">
                       {mergeReadiness.map((item) => (
                         <li className={`readiness-${item.status}`} key={item.id}>
@@ -1862,7 +1884,7 @@ export function App() {
                         </li>
                       ))}
                     </ul>
-                    {conflictDemoEnabled ? (
+                    {conflictFixtureEnabled ? (
                       <div className="conflict-box">
                         <strong>Conflict handling</strong>
                         <span>src/features/pr-summary/generateSummary.ts の summary format 変更が main 側と競合する想定です。</span>
@@ -1916,22 +1938,22 @@ export function App() {
                     <button className="button secondary" disabled={!gitStatus.hasChanges} onClick={createCommitDraft}>
                       Commit draft
                     </button>
-                    <button className="button secondary" disabled={!commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
-                      {isPushingBranch ? "Pushing" : realGitHubMode ? "Push" : "Demo push"}
+                    <button className="button secondary" disabled={!realGitHubMode || !commitCreated || branchPushed || isPushingBranch} onClick={pushBranch}>
+                      {isPushingBranch ? "Pushing" : "Push"}
                     </button>
-                    <button className="button" disabled={!safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
-                      {isCreatingPr ? "作成中" : realGitHubMode ? "PR 作成" : "Demo PR 作成"}
+                    <button className="button" disabled={!realGitHubMode || !safetyGate.canCreatePullRequest || !branchPushed || Boolean(createdPrUrl) || isCreatingPr} onClick={createPullRequest}>
+                      {isCreatingPr ? "作成中" : "PR 作成"}
                     </button>
                   </div>
                   <div className="github-box">
                     <div className="github-box-heading">
                       <strong>GitHub Integration</strong>
-                      <span className={realGitHubMode ? "mode-chip real" : "mode-chip demo"}>{githubOperationLabel}</span>
+                      <span className={realGitHubMode ? "mode-chip real" : "mode-chip setup"}>{githubOperationLabel}</span>
                     </div>
                     {!realGitHubMode ? (
-                      <div className="demo-warning">
-                        <strong>実 GitHub repository には接続していません</strong>
-                        <span>Repository / branch / history は demo 用の表示です。GitHub App credentials と Worker が有効になると selected repo への実操作に切り替わります。</span>
+                      <div className="setup-warning">
+                        <strong>実 GitHub repository に接続してください</strong>
+                        <span>GitHub App を selected repository に install すると、branch 作成、push、PR 作成をこの UI から実行できます。</span>
                       </div>
                     ) : null}
                     <div className="setup-checklist">
@@ -1968,7 +1990,7 @@ export function App() {
                       </label>
                     ) : null}
                     <label className="repo-select">
-                      <span>{realGitHubMode ? "Selected repository" : "Demo repository"}</span>
+                      <span>Selected repository</span>
                       <select
                         disabled={!realGitHubMode || githubRepositories.length === 0 || isLoadingGitHubRepositories}
                         value={selectedRepository}
@@ -1997,10 +2019,10 @@ export function App() {
                         onChange={(event) => setCloseIssueNumber(event.target.value)}
                       />
                     </label>
-                    <span>{realGitHubMode ? "GitHub App configured / selected repo mode" : "Demo mode / no GitHub write operation"}</span>
+                    <span>{realGitHubMode ? "GitHub App configured / selected repo mode" : "GitHub setup required"}</span>
                     {isLoadingGitHubRepositories ? <span>Repository を読み込み中</span> : null}
                     <span>{githubStatusMessage}</span>
-                    <span>{branchPushed ? (realGitHubMode ? "branch pushed" : "demo branch push simulated") : realGitHubMode ? "push pending" : "demo push pending"}</span>
+                    <span>{branchPushed ? "branch pushed" : realGitHubMode ? "push pending" : "connect GitHub to push"}</span>
                     {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}
                     <ul className="github-readiness">
@@ -2145,7 +2167,7 @@ export function App() {
                   workspaceName={workspaceName}
                 />
               </div>
-            ) : (
+            ) : selectedFile ? (
               <div className="editor-card">
                 <Editor
                   className="lf-monaco-editor"
@@ -2159,6 +2181,21 @@ export function App() {
                   theme="vs-dark"
                   value={currentFile}
                 />
+              </div>
+            ) : (
+              <div className="workspace-empty-state">
+                <strong>Repository を開いてください</strong>
+                <p>GitHub App で selected repository を接続するか、ローカルフォルダを開くと file tree と editor が表示されます。</p>
+                <div>
+                  <button
+                    className="button"
+                    disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
+                    onClick={openLocalWorkspace}
+                  >
+                    {isOpeningWorkspace ? "読み込み中" : "ローカル repo を開く"}
+                  </button>
+                  {githubInstallUrl ? <a className="button secondary" href={githubInstallUrl}>GitHub App を接続</a> : null}
+                </div>
               </div>
             )}
           </div>
@@ -2223,7 +2260,7 @@ export function App() {
                   <div className="preview-info">
                     <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
                     <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
-                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Recorded fallback" : previewPreflight.canAttemptWebContainer ? "WebContainer candidate" : "Recorded fallback"}</span>
+                    <span>mode: {previewMode === "webcontainer" ? "WebContainer iframe" : previewMode === "recorded" ? "Manual fallback" : previewPreflight.canAttemptWebContainer ? "WebContainer candidate" : "Manual fallback"}</span>
                     <span>{previewPreflight.reason}</span>
                     {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
                     <ul className="preview-preflight">
@@ -2246,7 +2283,7 @@ export function App() {
                       <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
                       <p>
                         {previewAvailable
-                          ? "対応環境では dev server の URL を取得し、この領域に iframe として表示します。非対応環境では recorded fallback として確認手順を表示します。"
+                          ? "対応環境では dev server の URL を取得し、この領域に iframe として表示します。非対応環境では失敗理由と URL bar fallback を表示します。"
                           : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
                       </p>
                     </div>
@@ -2274,7 +2311,7 @@ export function App() {
                 ) : commitCreated ? (
                   <pre className="terminal-view">{`Commit draft created\n\n${commitMessage}`}</pre>
                 ) : (
-                  <pre className="terminal-view">{testsRun ? demoOutputPassed : demoOutputIdle}</pre>
+                  <pre className="terminal-view">{testsRun ? runtimeOutputPassed : runtimeOutputIdle}</pre>
                 )
               ) : null}
             </div> : null}
@@ -2343,7 +2380,7 @@ export function App() {
               <section className="assistant-section">
                 <PanelTitle title="Model Routing" />
                 <div className="runtime-grid">
-                  {(["webllm", "recorded"] as VisibleAiRuntimeMode[]).map((runtime) => (
+                  {(["webllm"] as VisibleAiRuntimeMode[]).map((runtime) => (
                     <button
                       className={runtimeCardClassName(
                         aiRuntimeMode,
@@ -2462,18 +2499,25 @@ export function App() {
               <section className="assistant-section patch-section">
                 <PanelTitle title="Patch Queue" />
                 <div className="patch-queue-list" aria-label="Patch proposals">
-                  {patchQueue.map((item) => (
-                    <button
-                      className={`patch-queue-item ${item.proposal.id === activePatch.id ? "active" : ""}`}
-                      key={item.proposal.id}
-                      onClick={() => {
-                        setActivePatchId(item.proposal.id);
-                      }}
-                    >
-                      <span>{item.proposal.title}</span>
-                      <strong>{item.proposal.status}</strong>
-                    </button>
-                  ))}
+                  {patchQueue.length > 0 ? (
+                    patchQueue.map((item) => (
+                      <button
+                        className={`patch-queue-item ${item.proposal.id === activePatch.id ? "active" : ""}`}
+                        key={item.proposal.id}
+                        onClick={() => {
+                          setActivePatchId(item.proposal.id);
+                        }}
+                      >
+                        <span>{item.proposal.title}</span>
+                        <strong>{item.proposal.status}</strong>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="empty-state compact">
+                      <strong>Patch proposal はまだありません</strong>
+                      <p>WebLLM が利用可能な状態で、対象 file と Branch Goal から生成します。</p>
+                    </div>
+                  )}
                 </div>
                 <article className="patch-card">
                   <div className="patch-heading">
@@ -2482,7 +2526,7 @@ export function App() {
                   </div>
                   <p>{activePatch.summary}</p>
                   <p>{patchGenerationMessage}</p>
-                  <p className="patch-meta">source: {activePatchItem.source} / edits: {activePatch.edits.length}</p>
+                  <p className="patch-meta">source: {activePatchItem.source} / edits: {hasActivePatchProposal ? activePatch.edits.length : 0}</p>
                   {patchFailureReason ? <p className="patch-failure">reason: {patchFailureReason}</p> : null}
                   <ul className="check-list">
                     <li><CheckCircle2 size={15} /> 構造化 edit を解析済み</li>
@@ -2492,11 +2536,11 @@ export function App() {
                     <li>{testsRun ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} {testsRun ? "テスト通過" : "テスト未実行"}</li>
                   </ul>
                   <div className="patch-actions">
-                    <button className="button secondary" disabled={patchGenerationState === "running"} onClick={generateAiPatchProposal}>
+                    <button className="button secondary" disabled={patchGenerationState === "running" || (!selectedRuntimeAvailable && !testFixtureEnabled) || !selectedFile} onClick={generateAiPatchProposal}>
                       {patchGenerationState === "running" ? "生成中" : "AI patch を生成"}
                     </button>
                     <button className="button secondary" disabled={!canReviewPatch} onClick={openDiffPreview}>Diff を確認</button>
-                    <button className="button secondary danger" disabled={activePatch.status === "rejected" || activePatch.status === "applied"} onClick={rejectActivePatch}>Reject</button>
+                    <button className="button secondary danger" disabled={!hasActivePatchProposal || activePatch.status === "rejected" || activePatch.status === "applied"} onClick={rejectActivePatch}>Reject</button>
                     <button className="button" disabled={!canApplyPatch} onClick={applyPatch}>
                       適用
                     </button>
@@ -2549,8 +2593,6 @@ function LocalPreviewPanel({
   setPreviewAddress: (value: string) => void;
   workspaceName: string;
 }) {
-  const recordedPreviewHtml = createRecordedPreviewHtml(workspaceName, previewRunState);
-
   return (
     <div className="preview-panel">
       <form
@@ -2566,7 +2608,11 @@ function LocalPreviewPanel({
       {previewUrl ? (
         <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
       ) : previewAvailable ? (
-        <iframe className="preview-iframe" title={`${workspaceName} recorded preview`} srcDoc={recordedPreviewHtml} />
+        <div className="preview-frame">
+          <strong>{workspaceName}</strong>
+          <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
+          <p>WebContainer preview を起動するか、URL bar に localhost URL を入力してください。</p>
+        </div>
       ) : (
         <div className="preview-frame">
           <strong>{workspaceName}</strong>
@@ -2576,65 +2622,6 @@ function LocalPreviewPanel({
       )}
     </div>
   );
-}
-
-function createRecordedPreviewHtml(workspaceName: string, previewRunState: "idle" | "running" | "ready") {
-  const status = previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle";
-
-  return `<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root { color-scheme: light; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { margin: 0; background: #f5f7f8; color: #172026; }
-    .shell { min-height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
-    header { align-items: center; background: #ffffff; border-bottom: 1px solid #dfe5e8; display: flex; justify-content: space-between; padding: 0 22px; }
-    strong { font-size: 15px; }
-    .badge { background: #e9f7ef; border: 1px solid #bfe9cf; border-radius: 999px; color: #166534; font-size: 12px; padding: 5px 10px; }
-    main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) 300px; padding: 22px; }
-    .panel { background: #ffffff; border: 1px solid #dfe5e8; border-radius: 8px; box-shadow: 0 10px 30px rgba(20, 31, 36, 0.06); min-width: 0; padding: 18px; }
-    h1 { font-size: 22px; margin: 0 0 8px; }
-    p { color: #5f6f78; font-size: 14px; line-height: 1.6; margin: 0; }
-    .preview-list { display: grid; gap: 10px; margin-top: 18px; }
-    .row { align-items: center; border: 1px solid #e5ebee; border-radius: 6px; display: flex; justify-content: space-between; padding: 12px; }
-    .row span { color: #5f6f78; font-size: 13px; }
-    button { background: #172026; border: 0; border-radius: 6px; color: #ffffff; font: inherit; padding: 9px 12px; }
-    aside { display: grid; gap: 10px; }
-    .metric { display: grid; gap: 4px; }
-    .metric b { font-size: 20px; }
-    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="shell">
-    <header>
-      <strong>${escapeHtml(workspaceName)}</strong>
-      <span class="badge">${status}</span>
-    </header>
-    <main>
-      <section class="panel">
-        <h1>PR summary workflow</h1>
-        <p>Recorded preview shows the shape of the app while WebContainer or localhost preview is unavailable.</p>
-        <div class="preview-list">
-          <div class="row"><div><strong>Branch Goal</strong><br><span>PR 要約生成を改善する</span></div><button>Review</button></div>
-          <div class="row"><div><strong>Patch Queue</strong><br><span>1 structured edit ready</span></div><button>Diff</button></div>
-          <div class="row"><div><strong>Safety Gate</strong><br><span>Diff / Tests / Preview / PR draft</span></div><button>Run</button></div>
-        </div>
-      </section>
-      <aside>
-        <section class="panel metric"><span>Changed files</span><b>1</b><p>src/features/pr-summary/generateSummary.ts</p></section>
-        <section class="panel metric"><span>Runtime</span><b>Demo</b><p>Recorded fallback</p></section>
-      </aside>
-    </main>
-  </div>
-</body>
-</html>`;
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function ExplorerTree({
@@ -2932,9 +2919,10 @@ function createDirtyFileSet(savedFiles: Record<string, string>, workingFiles: Re
 }
 
 function workspaceSourceLabel(source: WorkspaceSnapshot["source"]) {
+  if (source === "empty") return "No Workspace";
   if (source === "local-directory") return "Local Directory";
   if (source === "indexeddb") return "Browser Snapshot";
-  return "Demo Repo";
+  return "Test Fixture";
 }
 
 function createContextBudget(input: {
@@ -3125,13 +3113,13 @@ function extractMarkdownTitle(markdown: string) {
 
 const runtimeLabels: Record<AiRuntimeMode, string> = {
   ollama: "Ollama",
-  recorded: "Recorded AI",
+  recorded: "Test fixture",
   webllm: "WebLLM",
 };
 
 const runtimeDescriptions: Record<AiRuntimeMode, string> = {
   ollama: "ローカル常駐モデルで重い判断を担当",
-  recorded: "デモが必ず成立する再生モード",
+  recorded: "テスト用の固定 proposal",
   webllm: "ブラウザ内で小さな判断を担当",
 };
 
@@ -3160,11 +3148,11 @@ const monacoDiffOptions = {
   readOnly: true,
 } as const;
 
-const demoTestLogIdle = `PS git-ai-ide> pnpm test
+const fixtureTestLogIdle = `PS git-ai-ide> pnpm test
 テストはまだ実行されていません。
-Patch を適用すると、ここからデモテストを実行できます。`;
+Patch を適用すると、runtime checks を実行できます。`;
 
-const demoTestLogPassed = `PS git-ai-ide> pnpm test
+const fixtureTestLogPassed = `PS git-ai-ide> pnpm test
 
 > pr-helper-mini@0.1.0 test
 > vitest run
@@ -3176,15 +3164,15 @@ Test Files  1 passed
 Tests       2 passed
 Duration    642ms`;
 
-const demoOutputIdle = `Git AI IDE Runtime
+const runtimeOutputIdle = `Git AI IDE Runtime
 WebContainer / local command runner の出力をここに集約します。`;
 
-const demoOutputPassed = `Git AI IDE Runtime
+const runtimeOutputPassed = `Git AI IDE Runtime
 Patch proposal applied.
 Safety checklist updated.
 Branch is ready for commit draft.`;
 
-const demoPrDraft = `# PR 要約生成を改善する
+const fixturePrDraft = `# PR 要約生成を改善する
 
 ## 概要
 - PR 要約生成の入力 diff が空の場合に、明示的なエラーとして扱うようにしました。

@@ -9,10 +9,10 @@
 - **Patch Queue**: ユーザーが review する前に、提案された edit を保持する場所。
 - **Diff Review**: patch apply や commit 前に確認する Monaco diff view。
 - **Safety Gate**: Branch Goal、context、model capability、patch review、test、commit draft、PR draft、未解決 warning を確認する soft gate。
-- **Recorded AI**: model setup なしでも demo が成立する deterministic fallback。
+- **Test fixture proposal**: E2E / unit test で UI workflow を安定検証するための deterministic proposal。通常 UI には出さない。
 - **WebLLM**: 小さな task を browser-local model で処理する runtime path。端末性能と task に応じて候補 model を絞る。
 - **Ollama legacy diagnostic**: 主機能から外した localhost LLM 検証経路。通常 UI では推奨しない。
-- **Runtime Plan**: WebContainer candidate や recorded fallback など、実行可能性を検出した結果。
+- **Runtime Plan**: WebContainer candidate や manual fallback など、実行可能性を検出した結果。
 
 ## 安全原則
 
@@ -47,6 +47,6 @@ GitHub:
 
 ## デモ境界
 
-Demo mode は first-class product mode です。setup なしでも安定して review できるようにするために存在します。
+User-facing demo mode は提供しません。通常 UI は実 GitHub repository または local folder を開くことを前提にします。
 
-ただし、demo は必ず demo と表示します。本物の GitHub、WebLLM、WebContainer 実行として説明してはいけません。
+テストでは fixture を使えますが、fixture は product mode ではありません。本物の GitHub、WebLLM、WebContainer 実行として説明してはいけません。

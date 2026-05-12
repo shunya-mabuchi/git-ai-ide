@@ -2,7 +2,7 @@ export type WorkspaceSnapshot = {
   files: Record<string, string>;
   name: string;
   openedAt: string;
-  source: "demo" | "local-directory" | "indexeddb";
+  source: "demo" | "empty" | "local-directory" | "indexeddb";
 };
 
 type LocalFileSystemFileHandle = {
@@ -79,7 +79,7 @@ export async function saveWorkspaceSnapshot(snapshot: WorkspaceSnapshot) {
     db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).put(
       {
         ...snapshot,
-        source: snapshot.source === "demo" ? "demo" : "indexeddb",
+        source: snapshot.source === "demo" || snapshot.source === "empty" ? snapshot.source : "indexeddb",
       },
       SNAPSHOT_KEY,
     ),

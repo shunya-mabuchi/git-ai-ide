@@ -13,7 +13,7 @@
 
 ## 状態・ロードマップ
 
-- [MVP 実装状況](mvp-implementation-status.md): 現在実装済みの機能と demo mode の境界
+- [MVP 実装状況](mvp-implementation-status.md): 現在実装済みの機能と実 runtime の境界
 - [完成までの残り機能](completion-roadmap.md): 実 E2E と本番運用品質に向けた残作業
 
 ## Agent 運用

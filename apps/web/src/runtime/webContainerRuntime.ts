@@ -102,7 +102,7 @@ export function createLocalPreviewPreflight(
   const items: LocalPreviewPreflightItem[] = [
     {
       detail: options.forceRecorded
-        ? "Demo workspace は高速な recorded preview を使います。"
+        ? "Test fixture は WebContainer を起動せずに確認します。"
         : "実 repo では WebContainer preview を best-effort で試します。native module / private registry / Docker / backend dependency が必要な repo は fallback します。",
       id: "source",
       label: "Workspace source",
@@ -309,14 +309,14 @@ function runRecordedChecks(plan: RuntimePlan, reason: string): RuntimeRunResult 
   return {
     log: [
       "Git AI IDE Runtime",
-      "mode: Recorded fallback",
+      "mode: Manual fallback",
       reason,
       "",
       `detected capability: ${plan.capability}`,
       `test: ${plan.testCommand ?? "not detected"}`,
       `typecheck: ${plan.typecheckCommand ?? "not detected"}`,
       "",
-      "Recorded checks passed for the demo workflow.",
+      "Runtime checks were not executed in this browser environment.",
     ].join("\n"),
     mode: "recorded",
     ok: true,
@@ -329,7 +329,7 @@ function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight)
   return {
     log: [
       "Git AI IDE Local Preview",
-      "mode: Recorded fallback",
+      "mode: Manual fallback",
       preflight.reason,
       "",
       "preflight:",
@@ -342,7 +342,7 @@ function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight)
       `build: ${plan.buildCommand ?? "not detected"}`,
       "",
       previewCommand
-        ? "対応環境では WebContainer dev server URL を iframe に best-effort で接続します。失敗時は理由を表示し、URL bar / recorded preview に fallback します。"
+        ? "対応環境では WebContainer dev server URL を iframe に best-effort で接続します。失敗時は理由を表示し、URL bar fallback に切り替えます。"
         : "dev / preview script を追加すると Local Preview の候補になります。",
     ].join("\n"),
     mode: "recorded",

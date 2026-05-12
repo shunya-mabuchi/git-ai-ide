@@ -57,32 +57,32 @@ describe("evaluateSafetyGate", () => {
 });
 
 describe("evaluatePullRequestFlow", () => {
-  it("marks demo mode ready when safety gate and branch push are complete", () => {
+  it("blocks PR creation until GitHub setup is ready", () => {
     expect(
       evaluatePullRequestFlow({
         baseBranch: "main",
-        branch: "feature/demo",
+        branch: "feature/change",
         branchPushed: true,
         githubConfigured: false,
         installationSelected: false,
-        repository: "demo/pr-helper-mini",
+        repository: "shunya-mabuchi/git-ai-ide",
         safetyGateReady: true,
       }),
     ).toMatchObject({
-      canCreatePullRequest: true,
-      mode: "demo",
-      summary: "ready",
+      canCreatePullRequest: false,
+      mode: "setup_required",
+      summary: "waiting",
     });
   });
 
   it("waits for branch push before PR creation", () => {
     const result = evaluatePullRequestFlow({
       baseBranch: "main",
-      branch: "feature/demo",
+      branch: "feature/change",
       branchPushed: false,
-      githubConfigured: false,
-      installationSelected: false,
-      repository: "demo/pr-helper-mini",
+      githubConfigured: true,
+      installationSelected: true,
+      repository: "shunya-mabuchi/git-ai-ide",
       safetyGateReady: true,
     });
 

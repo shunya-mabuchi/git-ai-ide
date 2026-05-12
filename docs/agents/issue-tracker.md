@@ -142,6 +142,33 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
 
+## GAI-045: Demo mode を user-facing UX から撤去する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:ai-runtime`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/93
+- 背景: Git AI IDE の主価値は selected repository を実 GitHub App 経由で扱うこと。通常 UI に demo / simulation / recorded fallback が出ると、本物の IDE 体験を損なう。
+- スコープ:
+  - 初期画面を GitHub repo 接続 / local folder open に変更する
+  - Source Control / GitHub Integration の user-facing demo 表示を削除する
+  - Recorded fallback を通常 UI から外し、WebLLM unavailable reason を表示する
+  - deterministic proposal は test fixture としてだけ残す
+  - E2E を fixture injection に変更する
+  - README / docs から demo を主機能のように見せる記述を削る
+- 受け入れ条件:
+  - 通常起動で Demo mode / Demo repository / Demo PR 作成が表示されない
+  - GitHub 未接続時は setup required と実操作条件が表示される
+  - E2E は `/?fixture=demo` で UI regression を検証できる
+  - typecheck / unit test / build / E2E が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck` 成功
+  - `pnpm --filter @git-ai-ide/shared test` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+
 ## GAI-038: GitHub PR の issue close linkage と実 E2E harness を追加する
 
 - 状態: 実装中
