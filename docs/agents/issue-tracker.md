@@ -67,7 +67,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-042: Local Preview / File UX / AI context の最終実用確認を追加する
 
-- 状態: 実装中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/82
@@ -90,6 +90,34 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
   - `pnpm --filter @git-ai-ide/web build` 成功
+  - PR #88 を merge 済み
+
+## GAI-043: 公開前 docs / repo hygiene / final smoke を完了する
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:ドキュメント`, `領域:docs`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/83
+- 背景: 本番公開は最後に行うが、public repository として見せられる状態にするには、古い未完成表現、秘密情報混入、不要ファイル、最終 smoke を確認する必要がある。
+- スコープ:
+  - README / docs の実装状況を現状へ更新する
+  - 非公開メモや private notes が public docs に混ざっていないことを確認する
+  - `.dev.vars` / `.pem` / secret が git 管理外であることを確認する
+  - secret scan 相当の grep を実行する
+  - typecheck / unit / E2E / build / Worker dry-run の final smoke を実行する
+- 受け入れ条件:
+  - README が現在の実装状態を正しく説明している
+  - public docs に private notes が混ざっていない
+  - tracked file に secret が含まれていない
+  - final smoke が通る
+- 検証:
+  - `git ls-files apps/worker/.dev.vars private-notes "*.pem"` が空
+  - `git grep` による secret pattern 確認
+  - `pnpm -r typecheck` 成功
+  - `pnpm -r test` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/worker deploy --dry-run` 成功
 
 ## GAI-037: File operations の dirty / save / Git diff 同期を完成させる
 
