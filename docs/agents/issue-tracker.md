@@ -19,7 +19,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-040: Web UI の GitHub real flow と error UX を完成させる
 
-- 状態: 実装中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/81
@@ -38,6 +38,31 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web test:e2e`
   - `pnpm --filter @git-ai-ide/web build`
   - `pnpm --filter @git-ai-ide/worker build`
+  - PR #86 を merge 済み
+
+## GAI-041: Patch Queue の複数案・reject・failed reason を実用化する
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:ai-runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/84
+- 背景: Patch Proposal は生成できるが、1 件の active proposal を上書きするだけでは AI IDE としての比較・保留・却下の UX が弱い。複数案を queue に積み、reject / failed reason / diff review / apply を一連で確認できる必要がある。
+- スコープ:
+  - Patch Queue を複数 proposal state に変更する
+  - proposal を選択できる UI を追加する
+  - reject 済み proposal と failed reason を表示する
+  - structured edit preview / apply failure を queue item に残す
+  - Patch Queue の apply / reject E2E を追加する
+- 受け入れ条件:
+  - AI patch 生成で queue に proposal が追加される
+  - reject 後に理由が表示される
+  - 別 proposal を選択して diff review / apply できる
+  - typecheck / unit test / E2E / build が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
 
 ## GAI-037: File operations の dirty / save / Git diff 同期を完成させる
 

@@ -112,4 +112,29 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".editor-surface .lf-monaco-editor")).toBeVisible();
     await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
   });
+
+  test("Patch Queue で複数 proposal を積み、reject と apply ができる", async ({ page }) => {
+    await page.goto("/");
+
+    if (!(await page.getByRole("heading", { name: "Patch Queue" }).isVisible())) {
+      await page.getByLabel("AI Assistant を表示").click();
+    }
+
+    await expect(page.getByRole("heading", { name: "Patch Queue" })).toBeVisible();
+    await page.getByRole("button", { name: "AI patch を生成" }).click();
+
+    await expect(page.locator(".patch-queue-item")).toHaveCount(2);
+    await expect(page.locator(".patch-card")).toContainText("source: ai");
+
+    await page.getByRole("button", { name: "Reject" }).click();
+    await expect(page.locator(".patch-card")).toContainText("reject");
+    await expect(page.locator(".patch-card")).toContainText("reason:");
+
+    await page.locator(".patch-queue-item").nth(1).click();
+    await page.getByRole("button", { name: "Diff を確認" }).click();
+    await expect(page.locator(".lf-monaco-diff")).toBeVisible();
+
+    await page.getByRole("button", { name: "確認して適用" }).click();
+    await expect(page.locator(".patch-card")).toContainText("適用済み");
+  });
 });

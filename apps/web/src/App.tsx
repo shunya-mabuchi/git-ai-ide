@@ -65,6 +65,13 @@ type GitHubSetupState = "checking" | "worker-offline" | "secrets-missing" | "ins
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
+type PatchQueueSource = "demo" | "ai" | "ollama-diagnostic";
+
+type PatchQueueItem = {
+  failureReason?: string;
+  proposal: PatchProposal;
+  source: PatchQueueSource;
+};
 
 type SearchResult = {
   file: string;
@@ -150,7 +157,8 @@ export function App() {
   const [isOpeningWorkspace, setIsOpeningWorkspace] = useState(false);
   const [workspaceRestored, setWorkspaceRestored] = useState(false);
   const [patchApplied, setPatchApplied] = useState(false);
-  const [activePatch, setActivePatch] = useState<PatchProposal>(demoPatch);
+  const [patchQueue, setPatchQueue] = useState<PatchQueueItem[]>([{ proposal: demoPatch, source: "demo" }]);
+  const [activePatchId, setActivePatchId] = useState(demoPatch.id);
   const [patchGenerationState, setPatchGenerationState] = useState<"idle" | "running">("idle");
   const [patchGenerationMessage, setPatchGenerationMessage] = useState("Recorded AI demo patch を読み込み済みです。");
   const [diffOpen, setDiffOpen] = useState(false);
@@ -573,9 +581,15 @@ export function App() {
     [branchPushed, conflictDemoEnabled, gitStatus.entries.length, gitStatus.hasChanges, mergeTargetBranch, previewRunState, testsRun],
   );
   const currentFile = files[selectedFile] ?? "";
+  const activePatchItem = patchQueue.find((item) => item.proposal.id === activePatchId) ?? patchQueue[0] ?? { proposal: demoPatch, source: "demo" };
+  const activePatch = activePatchItem.proposal;
   const preview = useMemo(() => applyStructuredEdits(files, activePatch.edits), [activePatch.edits, files]);
   const primaryEdit = activePatch.edits[0] ?? demoPatch.edits[0];
   const patchTargetAvailable = Boolean(files[primaryEdit.file]);
+  const activePatchRejected = activePatch.status === "rejected";
+  const canReviewPatch = patchTargetAvailable && !activePatchRejected;
+  const canApplyPatch = canReviewPatch && preview.ok && !patchApplied;
+  const patchFailureReason = activePatchItem.failureReason ?? (!preview.ok ? preview.error : "");
   const previewFile = preview.ok ? preview.files[primaryEdit.file] : undefined;
   const activeDiffFile = diffMode === "patch" ? primaryEdit.file : diffFile;
   const diffOriginal = diffMode === "patch" ? files[primaryEdit.file] : baselineFiles[activeDiffFile] ?? "";
@@ -783,11 +797,35 @@ export function App() {
     ],
   );
 
+  const resetPatchQueueToDemo = () => {
+    setPatchQueue([{ proposal: demoPatch, source: "demo" }]);
+    setActivePatchId(demoPatch.id);
+  };
+
+  const queuePatchProposal = (proposal: PatchProposal, source: PatchQueueSource, failureReason?: string) => {
+    setPatchQueue((currentQueue) => [
+      { failureReason, proposal, source },
+      ...currentQueue.filter((item) => item.proposal.id !== proposal.id),
+    ]);
+    setActivePatchId(proposal.id);
+  };
+
+  const updateActivePatchQueueItem = (updates: Partial<PatchQueueItem> & { proposal?: PatchProposal }) => {
+    setPatchQueue((currentQueue) =>
+      currentQueue.map((item) => (item.proposal.id === activePatch.id ? { ...item, ...updates } : item)),
+    );
+  };
+
   const openDiffPreview = () => {
     if (!patchTargetAvailable) {
       setSidePanelMode("git");
       setExplorerVisible(true);
       setWorkspaceError("このデモ patch の対象ファイルは、現在の workspace にはありません。");
+      return;
+    }
+
+    if (activePatchRejected) {
+      setWorkspaceError("Reject 済みの patch proposal は Diff review できません。別の proposal を選択してください。");
       return;
     }
 
@@ -816,7 +854,7 @@ export function App() {
       return;
     }
 
-    setActivePatch(result.proposal);
+    queuePatchProposal(result.proposal, "ai", result.warnings.length ? result.warnings.join(" / ") : undefined);
     setPatchApplied(false);
     setTestsRun(false);
     setRuntimeLog(demoTestLogIdle);
@@ -829,7 +867,7 @@ export function App() {
     setDiffFile(result.proposal.edits[0]?.file ?? selectedFile);
     setDiffOpen(false);
     setPatchGenerationMessage(
-      `${runtimeLabels[result.mode]} で patch proposal を生成しました。${result.warnings.length ? ` ${result.warnings.join(" / ")}` : ""}`,
+      `${runtimeLabels[result.mode]} で patch proposal を queue に追加しました。${result.warnings.length ? ` ${result.warnings.join(" / ")}` : ""}`,
     );
     setPatchGenerationState("idle");
   };
@@ -852,7 +890,7 @@ export function App() {
     });
 
     if (result.ok) {
-      setActivePatch(result.proposal);
+      queuePatchProposal(result.proposal, "ollama-diagnostic", result.warnings.length ? result.warnings.join(" / ") : undefined);
       setPatchApplied(false);
       setTestsRun(false);
       setPrDraftGenerated(false);
@@ -1134,8 +1172,21 @@ export function App() {
   };
 
   const applyPatch = () => {
-    if (!preview.ok) return;
+    if (!preview.ok) {
+      updateActivePatchQueueItem({
+        failureReason: preview.error,
+        proposal: { ...activePatch, status: "needs_attention" },
+      });
+      setPatchGenerationMessage(`Patch apply failed: ${preview.error}`);
+      setBottomPanelMode("problems");
+      setBottomPanelCollapsed(false);
+      return;
+    }
     setFiles(preview.files);
+    updateActivePatchQueueItem({
+      failureReason: undefined,
+      proposal: { ...activePatch, status: "applied" },
+    });
     setPatchApplied(true);
     setTestsRun(false);
     setRuntimeLog(demoTestLogIdle);
@@ -1144,6 +1195,16 @@ export function App() {
     setBranchPushed(false);
     setCreatedPrUrl("");
     setDiffOpen(false);
+  };
+
+  const rejectActivePatch = () => {
+    updateActivePatchQueueItem({
+      failureReason: "この patch proposal は reject 済みです。",
+      proposal: { ...activePatch, status: "rejected" },
+    });
+    setPatchApplied(false);
+    setDiffOpen(false);
+    setPatchGenerationMessage(`${activePatch.title} を reject しました。`);
   };
 
   const selectGitHubInstallation = async (installationId: number) => {
@@ -1341,7 +1402,7 @@ export function App() {
       setDiffFile(preferredFile);
       setDiffOpen(false);
       setPatchApplied(false);
-      setActivePatch(demoPatch);
+      resetPatchQueueToDemo();
       setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
       setTestsRun(false);
       setRuntimeLog(demoTestLogIdle);
@@ -1374,7 +1435,7 @@ export function App() {
     setDiffFile("src/features/pr-summary/generateSummary.ts");
     setDiffOpen(false);
     setPatchApplied(false);
-    setActivePatch(demoPatch);
+    resetPatchQueueToDemo();
     setPatchGenerationMessage("Recorded AI demo patch を読み込み済みです。");
     setTestsRun(false);
     setRuntimeLog(demoTestLogIdle);
@@ -1843,7 +1904,7 @@ export function App() {
                     ) : (
                       <div className="empty-change">workspace に変更はありません</div>
                     )}
-                    {!patchApplied ? (
+                    {!patchApplied && !activePatchRejected ? (
                       <button className="change-item proposed" onClick={openDiffPreview}>
                         <span>{primaryEdit.file}</span>
                         <strong>{patchTargetAvailable ? "proposed patch" : "not in workspace"}</strong>
@@ -1851,8 +1912,8 @@ export function App() {
                     ) : null}
                   </div>
                   <div className="git-actions">
-                    <button className="button secondary" disabled={!patchTargetAvailable} onClick={openDiffPreview}>Diff を確認</button>
-                    <button className="button" disabled={!patchTargetAvailable || !preview.ok || patchApplied} onClick={applyPatch}>
+                    <button className="button secondary" disabled={!canReviewPatch} onClick={openDiffPreview}>Diff を確認</button>
+                    <button className="button" disabled={!canApplyPatch} onClick={applyPatch}>
                       Patch を適用
                     </button>
                     <button className="button secondary" disabled={!gitStatus.hasChanges} onClick={createCommitDraft}>
@@ -2064,7 +2125,7 @@ export function App() {
                   <div className="patch-actions">
                     <button className="button secondary" onClick={() => setDiffOpen(false)}>戻る</button>
                     {diffMode === "patch" ? (
-                      <button className="button" disabled={!preview.ok || patchApplied} onClick={applyPatch}>
+                      <button className="button" disabled={!canApplyPatch} onClick={applyPatch}>
                         確認して適用
                       </button>
                     ) : null}
@@ -2367,26 +2428,43 @@ export function App() {
 
               <section className="assistant-section patch-section">
                 <PanelTitle title="Patch Queue" />
+                <div className="patch-queue-list" aria-label="Patch proposals">
+                  {patchQueue.map((item) => (
+                    <button
+                      className={`patch-queue-item ${item.proposal.id === activePatch.id ? "active" : ""}`}
+                      key={item.proposal.id}
+                      onClick={() => {
+                        setActivePatchId(item.proposal.id);
+                      }}
+                    >
+                      <span>{item.proposal.title}</span>
+                      <strong>{item.proposal.status}</strong>
+                    </button>
+                  ))}
+                </div>
                 <article className="patch-card">
                   <div className="patch-heading">
                     <strong>{activePatch.title}</strong>
-                    <span>{patchApplied ? "適用済み" : preview.ok ? "レビュー可能" : "確認が必要"}</span>
+                    <span>{activePatch.status === "rejected" ? "reject 済み" : patchApplied || activePatch.status === "applied" ? "適用済み" : preview.ok ? "レビュー可能" : "確認が必要"}</span>
                   </div>
                   <p>{activePatch.summary}</p>
                   <p>{patchGenerationMessage}</p>
+                  <p className="patch-meta">source: {activePatchItem.source} / edits: {activePatch.edits.length}</p>
+                  {patchFailureReason ? <p className="patch-failure">reason: {patchFailureReason}</p> : null}
                   <ul className="check-list">
                     <li><CheckCircle2 size={15} /> 構造化 edit を解析済み</li>
                     <li>{patchTargetAvailable ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} 対象ファイル</li>
-                    <li>{preview.ok ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} 対象テキストが一致</li>
-                    <li>{preview.ok ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} Diff preview を生成済み</li>
+                    <li>{preview.ok && !activePatchRejected ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} 対象テキストが一致</li>
+                    <li>{preview.ok && !activePatchRejected ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} Diff preview を生成済み</li>
                     <li>{testsRun ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />} {testsRun ? "テスト通過" : "テスト未実行"}</li>
                   </ul>
                   <div className="patch-actions">
                     <button className="button secondary" disabled={patchGenerationState === "running"} onClick={generateAiPatchProposal}>
                       {patchGenerationState === "running" ? "生成中" : "AI patch を生成"}
                     </button>
-                    <button className="button secondary" disabled={!patchTargetAvailable} onClick={openDiffPreview}>Diff を確認</button>
-                    <button className="button" disabled={!patchTargetAvailable || !preview.ok || patchApplied} onClick={applyPatch}>
+                    <button className="button secondary" disabled={!canReviewPatch} onClick={openDiffPreview}>Diff を確認</button>
+                    <button className="button secondary danger" disabled={activePatch.status === "rejected" || activePatch.status === "applied"} onClick={rejectActivePatch}>Reject</button>
+                    <button className="button" disabled={!canApplyPatch} onClick={applyPatch}>
                       適用
                     </button>
                   </div>
