@@ -695,6 +695,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - Playwright E2E で preview tab / iframe readiness 表示を確認する
   - deploy 環境で実 WebContainer preview を手動確認する
 
+## GAI-034: Ollama 実 runtime E2E を完了する
+
+- 状態: 進行中
+- ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/60
+- 背景: Ollama Patch Proposal の UI 診断はあるが、`ollama serve` と `model pull` 済み環境で実 runtime が Patch Proposal schema validation を通ることの E2E が未完了。
+- スコープ:
+  - Ollama 実 runtime を CLI / UI から確認できるようにする
+  - 実 model がある場合に patch proposal を生成し、schema validation を通す
+  - Ollama 未起動または invalid response では recorded fallback と理由が分かるようにする
+  - 実行手順を日本語 docs に残す
+- 受け入れ条件:
+  - Ollama 起動済み環境で `mode: ollama` の Patch Proposal が得られる
+  - model id が診断結果に表示される
+  - Patch Proposal が Patch Queue に入れられる形式で validation される
+  - Ollama 未接続でも fallback が明示される
+- 検証:
+  - Ollama 実 runtime E2E script を追加し、未接続時の説明も含める
+  - UI E2E で fallback 診断が壊れていないことを確認する
+  - 実 Ollama 環境では script で `mode: ollama` を確認する
+
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
 - 状態: 完了
