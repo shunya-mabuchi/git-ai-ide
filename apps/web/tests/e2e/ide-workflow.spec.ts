@@ -61,6 +61,27 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByRole("button", { name: /generateSummary\.ts modified/ })).toBeVisible();
   });
 
+  test("rename と delete 後に tab / selected file / Git diff が同期する", async ({ page }) => {
+    await page.goto("/");
+
+    if (!(await page.getByText("New file").isVisible())) {
+      await page.getByLabel("Explorer").click();
+    }
+
+    await page.locator(".file-operation-panel input").nth(2).fill("src/features/pr-summary/renamed-note.md");
+    await page.getByTitle("選択中ファイルを改名").click();
+    await expect(page.locator(".editor-tabs .tab", { hasText: "renamed-note.md" })).toBeVisible();
+    await expect(page.locator(".file-list").getByRole("button", { name: "renamed-note.md" })).toBeVisible();
+
+    await page.locator(".file-list").getByRole("button", { name: "renamed-note.md" }).click();
+    await page.getByTitle("選択中ファイルを削除").click();
+    await expect(page.locator(".editor-tabs .tab", { hasText: "Diff: src/features/pr-summary/renamed-note.md" })).toBeVisible();
+    await expect(page.locator(".context-pack-details")).toContainText("README.md");
+
+    await page.getByLabel("Git").click();
+    await expect(page.getByRole("button", { name: /generateSummary\.ts deleted/ })).toBeVisible();
+  });
+
   test("WebLLM model load 診断は WebGPU 非対応環境で fallback reason を表示する", async ({ page }) => {
     await page.goto("/");
 
@@ -106,6 +127,10 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByLabel("Preview URL")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-iframe")).toBeVisible();
     await expect(page.locator(".editor-surface")).not.toContainText("Preview diagnostics");
+
+    await page.getByLabel("Preview URL").fill("localhost:5173");
+    await page.locator(".preview-addressbar").getByRole("button", { name: "開く" }).click();
+    await expect(page.locator(".editor-surface .preview-iframe")).toHaveAttribute("src", "http://localhost:5173");
 
     await page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts" }).click();
 

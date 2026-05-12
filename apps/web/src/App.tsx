@@ -29,7 +29,7 @@ import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson, requestPatchProposal } from "@git-ai-ide/ai-runtime";
 import { createSnapshotGitStatus, summarizeGitStatus } from "@git-ai-ide/git-core";
 import { applyStructuredEdits } from "@git-ai-ide/patch-core";
-import { evaluatePullRequestFlow, evaluateSafetyGate, type PatchProposal } from "@git-ai-ide/shared";
+import { evaluatePullRequestFlow, evaluateSafetyGate, type ContextPack, type PatchProposal } from "@git-ai-ide/shared";
 import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
@@ -610,6 +610,20 @@ export function App() {
       }),
     [assistedMemory, branchGoalMarkdown, currentFile, fileNames.length, gitStatus.entries.length, taskPriority],
   );
+  const contextPack = useMemo<ContextPack>(
+    () => ({
+      assistedMemory,
+      branchGoalMarkdown,
+      currentFile,
+      fileCount: fileNames.length,
+      gitChangeCount: gitStatus.entries.length,
+      tokenBudget: {
+        limit: contextBudget.limit,
+        used: contextBudget.used,
+      },
+    }),
+    [assistedMemory, branchGoalMarkdown, contextBudget.limit, contextBudget.used, currentFile, fileNames.length, gitStatus.entries.length],
+  );
   const runtimeSuggestion = suggestRuntimeMode({
     aiRuntimeStatus,
     budgetRatio: contextBudget.used / contextBudget.limit,
@@ -776,9 +790,12 @@ export function App() {
         branchName,
         changedFiles: gitStatus.entries,
         closeIssueNumber: normalizeIssueNumber(closeIssueNumber),
+        contextBudget,
+        contextPriority: taskPriority,
         previewChecked: previewRunState === "ready",
         runtimeLabel: selectedRuntimeLabel,
         safetyReady: safetyGate.canCreatePullRequest,
+        selectedFile,
         testsPassed: testsRun,
         title: extractMarkdownTitle(branchGoalMarkdown) || "Git AI IDE PR",
         warnings: runtimePlan.warnings,
@@ -788,11 +805,14 @@ export function App() {
       branchGoalMarkdown,
       branchName,
       closeIssueNumber,
+      contextBudget,
       gitStatus.entries,
       previewRunState,
       runtimePlan.warnings,
       safetyGate.canCreatePullRequest,
       selectedRuntimeLabel,
+      selectedFile,
+      taskPriority,
       testsRun,
     ],
   );
@@ -844,6 +864,7 @@ export function App() {
         content: currentFile,
         path: selectedFile,
       },
+      context: contextPack,
       modelId: selectedRuntimeHealth?.modelIds[0],
       mode: aiRuntimeMode,
     });
@@ -884,6 +905,7 @@ export function App() {
         content: currentFile,
         path: selectedFile,
       },
+      context: contextPack,
       mode: "ollama",
       modelId,
       timeoutMs: 20_000,
@@ -2327,6 +2349,20 @@ export function App() {
                   <li>{gitStatus.hasChanges ? <CheckCircle2 size={15} /> : <Circle size={15} />} Git diff</li>
                   <li>{assistedMemory.trim() ? <CheckCircle2 size={15} /> : <Circle size={15} />} Assisted Memory</li>
                 </ul>
+                <dl className="context-pack-details">
+                  <div>
+                    <dt>selected</dt>
+                    <dd>{selectedFile}</dd>
+                  </div>
+                  <div>
+                    <dt>changes</dt>
+                    <dd>{gitStatus.entries.length ? gitStatus.entries.map((entry) => entry.file).join(", ") : "なし"}</dd>
+                  </div>
+                  <div>
+                    <dt>priority</dt>
+                    <dd>{taskPriority}</dd>
+                  </div>
+                </dl>
               </section>
 
               <section className="assistant-section">
@@ -3001,9 +3037,12 @@ function createPrDraftMarkdown(input: {
   branchName: string;
   changedFiles: Array<{ file: string; status: string }>;
   closeIssueNumber: string;
+  contextBudget: ReturnType<typeof createContextBudget>;
+  contextPriority: TaskPriority;
   previewChecked: boolean;
   runtimeLabel: string;
   safetyReady: boolean;
+  selectedFile: string;
   testsPassed: boolean;
   title: string;
   warnings: string[];
@@ -3025,6 +3064,12 @@ function createPrDraftMarkdown(input: {
 - branch: \`${input.branchName}\`
 - 目的: ${goalSummary}
 - 生成 runtime: ${input.runtimeLabel}
+
+## AI Context
+- selected file: \`${input.selectedFile}\`
+- priority tier: ${input.contextPriority}
+- budget: ${input.contextBudget.used}/${input.contextBudget.limit} tokens (${input.contextBudget.percent}%)
+- changed files: ${input.changedFiles.length}
 
 ## 変更内容
 ${changedFileLines}

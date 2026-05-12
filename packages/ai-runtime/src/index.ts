@@ -36,6 +36,7 @@ export type AiTaskResult = {
 
 export type PatchProposalRequest = {
   branchGoalMarkdown: string;
+  context?: ContextPack;
   currentFile: {
     content: string;
     path: string;
@@ -428,6 +429,7 @@ export async function requestPatchProposal(request: PatchProposalProviderRequest
     const rawText = await generateOllamaPatchJson({
       baseUrl: request.ollamaBaseUrl ?? "http://localhost:11434",
       branchGoalMarkdown: request.branchGoalMarkdown,
+      context: request.context,
       currentFile: request.currentFile,
       fetchImpl,
       modelId,
@@ -493,6 +495,7 @@ export function parseLlmPatchProposal(request: LlmPatchProposalParseRequest): Pa
 async function generateOllamaPatchJson(input: {
   baseUrl: string;
   branchGoalMarkdown: string;
+  context?: ContextPack;
   currentFile: { content: string; path: string };
   fetchImpl: typeof fetch;
   modelId: string;
@@ -509,7 +512,7 @@ async function generateOllamaPatchJson(input: {
         options: {
           temperature: 0.1,
         },
-        prompt: createPatchProposalPrompt(input.branchGoalMarkdown, input.currentFile),
+        prompt: createPatchProposalPrompt(input.branchGoalMarkdown, input.currentFile, input.context),
         stream: false,
       }),
       headers: {
@@ -534,7 +537,16 @@ async function generateOllamaPatchJson(input: {
   }
 }
 
-function createPatchProposalPrompt(branchGoalMarkdown: string, currentFile: { content: string; path: string }) {
+function createPatchProposalPrompt(branchGoalMarkdown: string, currentFile: { content: string; path: string }, context?: ContextPack) {
+  const contextLines = context
+    ? [
+        `- fileCount: ${context.fileCount}`,
+        `- gitChangeCount: ${context.gitChangeCount}`,
+        `- tokenBudget: ${context.tokenBudget.used}/${context.tokenBudget.limit}`,
+        `- assistedMemory: ${context.assistedMemory.trim() || "none"}`,
+      ]
+    : ["- Context Pack は未提供。"];
+
   return [
     "あなたは Git AI IDE の patch proposal generator です。",
     "次の JSON object だけを返してください。Markdown fence や説明文は禁止です。",
@@ -561,6 +573,9 @@ function createPatchProposalPrompt(branchGoalMarkdown: string, currentFile: { co
     "",
     "Branch Goal:",
     branchGoalMarkdown,
+    "",
+    "AI Context:",
+    ...contextLines,
     "",
     `Current file: ${currentFile.path}`,
     "```",
