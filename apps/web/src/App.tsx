@@ -1309,6 +1309,8 @@ export function App() {
       });
       setBranchPushed(true);
       setPushedCommitSha(result.commit.sha ?? "");
+      setBaselineFiles(files);
+      setSavedFiles(files);
       setGithubStatusMessage(result.mode === "github" ? "Branch pushed to GitHub" : "Demo branch pushed");
       setBottomPanelMode("output");
       setBottomPanelCollapsed(false);
@@ -1456,10 +1458,6 @@ export function App() {
     setBranchPushed(false);
     setPushedCommitSha("");
     setCreatedPrUrl("");
-    setBaselineFiles(files);
-    setSavedFiles(files);
-    setPatchApplied(false);
-    setPrDraftGenerated(false);
     setBottomPanelMode("output");
     setBottomPanelCollapsed(false);
   };
@@ -1484,14 +1482,15 @@ export function App() {
         title: extractMarkdownTitle(branchGoalMarkdown) || "Git AI IDE PR",
       });
       setCreatedPrUrl(result.pullRequest.url);
-      setGithubStatusMessage(result.mode === "github" ? "GitHub PR created" : "Demo PR created");
+      setGithubStatusMessage(
+        result.warning ?? (result.mode === "github" ? `GitHub PR created: #${result.pullRequest.number}` : "Demo PR created"),
+      );
       setBottomPanelMode("output");
       setBottomPanelCollapsed(false);
     } catch (error) {
-      const fallbackUrl = `https://github.com/${selectedRepository}/pull/128`;
-      setCreatedPrUrl(fallbackUrl);
-      setGithubStatusMessage(error instanceof Error ? `Worker fallback: ${error.message}` : "Worker fallback");
-      setBottomPanelMode("output");
+      setCreatedPrUrl("");
+      setGithubStatusMessage(error instanceof Error ? `PR creation failed: ${error.message}` : "PR creation failed");
+      setBottomPanelMode("problems");
       setBottomPanelCollapsed(false);
     } finally {
       setIsCreatingPr(false);

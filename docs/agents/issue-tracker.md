@@ -17,6 +17,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-040: Web UI の GitHub real flow と error UX を完成させる
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/81
+- 背景: Worker API 直叩きでは GitHub App 実 E2E が通った。次は Web UI から installation / repo 選択、branch 作成、push、PR 作成まで自然に完走できることを確認し、失敗時の理由表示を改善する。
+- スコープ:
+  - UI real mode flow の E2E harness を追加する
+  - GitHub API error / D1 migration 未適用時の理由表示を改善する
+  - PR 作成後の URL / close issue number 表示を確認する
+  - demo mode / real mode の違いをより明確にする
+- 受け入れ条件:
+  - UI から repo 選択、branch 作成、push、PR 作成が確認できる
+  - PR body に close issue number が入る
+  - GitHub / Worker error がユーザーに分かる文言で表示される
+- 検証:
+  - `GIT_AI_IDE_REAL_GITHUB_E2E=1 GIT_AI_IDE_REAL_GITHUB_WRITE_E2E=1 pnpm --filter @git-ai-ide/web test:e2e -- github-real.spec.ts`
+  - `pnpm --filter @git-ai-ide/web test:e2e`
+  - `pnpm --filter @git-ai-ide/web build`
+  - `pnpm --filter @git-ai-ide/worker build`
+
 ## GAI-037: File operations の dirty / save / Git diff 同期を完成させる
 
 - 状態: 実装中
