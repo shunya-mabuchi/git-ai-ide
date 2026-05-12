@@ -744,7 +744,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-034: Ollama 実 runtime E2E を完了する
 
-- 状態: 進行中
+- 状態: 実装中
 - ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/60
@@ -763,6 +763,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - Ollama 実 runtime E2E script を追加し、未接続時の説明も含める
   - UI E2E で fallback 診断が壊れていないことを確認する
   - 実 Ollama 環境では script で `mode: ollama` を確認する
+  - `OLLAMA_E2E_REQUIRED=1` のときだけ未接続を失敗扱いにする
 
 ## GAI-035: WebLLM 実モデルロード E2E を完了する
 

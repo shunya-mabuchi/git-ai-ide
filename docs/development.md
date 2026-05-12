@@ -65,13 +65,21 @@ ollama pull qwen2.5-coder:7b
 OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-ide/ai-runtime test:ollama-real
 ```
 
+Ollama 未起動の通常環境では `mode: recorded` と fallback reason を表示して終了します。
+実 runtime を必須にしたい場合だけ、次のようにします。
+
+```bash
+OLLAMA_E2E_REQUIRED=1 OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-ide/ai-runtime test:ollama-real
+```
+
 環境変数:
 
 - `OLLAMA_BASE_URL`: 既定値は `http://localhost:11434`
 - `OLLAMA_E2E_MODEL`: 利用する model。未指定なら `/api/tags` の先頭を使います
+- `OLLAMA_E2E_REQUIRED`: `1` のときだけ実 Ollama 未接続を失敗扱いにします
 - `OLLAMA_E2E_TIMEOUT_MS`: 既定値は `60000`
 
-この E2E は Ollama `/api/tags` と `/api/generate` を実際に呼び、`mode: ollama` の Patch Proposal 形式を検証します。Ollama 未起動または model 未取得の場合は、先に `ollama serve` と `ollama pull` を実行してください。
+この E2E は Ollama `/api/tags` と `/api/generate` を実際に呼び、`mode: ollama` の Patch Proposal 形式を検証します。
 
 ## WebLLM 実モデルロード
 

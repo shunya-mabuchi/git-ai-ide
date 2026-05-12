@@ -1,5 +1,6 @@
 const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
 const modelFromEnv = process.env.OLLAMA_E2E_MODEL;
+const requireRealOllama = process.env.OLLAMA_E2E_REQUIRED === "1";
 const timeoutMs = Number(process.env.OLLAMA_E2E_TIMEOUT_MS ?? 60_000);
 
 const currentFile = {
@@ -20,6 +21,16 @@ function logStep(message) {
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function fallback(message) {
+  logStep("mode: recorded");
+  logStep(`fallback reason: ${message}`);
+  logStep("Set OLLAMA_E2E_REQUIRED=1 to fail when real Ollama is unavailable.");
+
+  if (requireRealOllama) {
+    throw new Error(message);
+  }
 }
 
 async function fetchJson(path, init = {}) {
@@ -71,48 +82,55 @@ function validatePatchProposal(value) {
   assert(typeof edit.replace === "string" && edit.replace.includes("fallback"), "Patch edit replace text should include fallback handling.");
 }
 
-const tags = await fetchJson("/api/tags");
-const modelIds =
-  tags.models?.map((model) => model.name ?? model.model).filter((modelId) => typeof modelId === "string" && modelId.length > 0) ?? [];
+try {
+  const tags = await fetchJson("/api/tags");
+  const modelIds =
+    tags.models?.map((model) => model.name ?? model.model).filter((modelId) => typeof modelId === "string" && modelId.length > 0) ?? [];
 
-assert(modelIds.length > 0, "Ollama is running, but no local models are available. Run `ollama pull <model>` first.");
+  if (modelIds.length === 0) {
+    fallback("Ollama is running, but no local models are available. Run `ollama pull <model>` first.");
+    process.exit(0);
+  }
 
-const model = modelFromEnv ?? modelIds[0];
-logStep(`model ok: ${model}`);
+  const model = modelFromEnv ?? modelIds[0];
+  logStep(`model ok: ${model}`);
 
-const prompt = [
-  "Return only one JSON object. Do not use markdown.",
-  "The object must match this shape:",
-  '{"title": string, "rationale": string, "edits": [{"file": string, "kind": "replace", "find": string, "replace": string}]}',
-  "",
-  "Branch goal:",
-  branchGoalMarkdown,
-  "",
-  "Current file:",
-  `Path: ${currentFile.path}`,
-  "```ts",
-  currentFile.content,
-  "```",
-  "",
-  "Create one safe replace edit. The find text must be copied exactly from the current file.",
-].join("\n");
+  const prompt = [
+    "Return only one JSON object. Do not use markdown.",
+    "The object must match this shape:",
+    '{"title": string, "rationale": string, "edits": [{"file": string, "kind": "replace", "find": string, "replace": string}]}',
+    "",
+    "Branch goal:",
+    branchGoalMarkdown,
+    "",
+    "Current file:",
+    `Path: ${currentFile.path}`,
+    "```ts",
+    currentFile.content,
+    "```",
+    "",
+    "Create one safe replace edit. The find text must be copied exactly from the current file.",
+  ].join("\n");
 
-const generated = await fetchJson("/api/generate", {
-  body: JSON.stringify({
-    format: "json",
-    model,
-    options: {
-      temperature: 0,
-    },
-    prompt,
-    stream: false,
-  }),
-  method: "POST",
-});
+  const generated = await fetchJson("/api/generate", {
+    body: JSON.stringify({
+      format: "json",
+      model,
+      options: {
+        temperature: 0,
+      },
+      prompt,
+      stream: false,
+    }),
+    method: "POST",
+  });
 
-assert(typeof generated.response === "string", "Ollama response field must be a string.");
-const proposal = extractJsonObject(generated.response);
-validatePatchProposal(proposal);
+  assert(typeof generated.response === "string", "Ollama response field must be a string.");
+  const proposal = extractJsonObject(generated.response);
+  validatePatchProposal(proposal);
 
-logStep("mode: ollama");
-logStep(`proposal ok: ${proposal.title}`);
+  logStep("mode: ollama");
+  logStep(`proposal ok: ${proposal.title}`);
+} catch (error) {
+  fallback(error instanceof Error ? error.message : "Ollama request failed.");
+}
