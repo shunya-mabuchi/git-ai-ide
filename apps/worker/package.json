@@ -8,6 +8,7 @@
     "build": "wrangler deploy --dry-run",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test:github-real": "node scripts/github-real-e2e.mjs",
     "test": "echo \"No tests yet\""
   },
   "devDependencies": {
@@ -16,4 +17,3 @@
     "wrangler": "^3.101.0"
   }
 }
-

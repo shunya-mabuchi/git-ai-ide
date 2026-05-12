@@ -90,6 +90,32 @@ secret 未設定時は demo mode を返します。これにより、GitHub App 
 - `/api/github/repos?installation_id=...` が selected repository を返す
 - GitHub Integration が `Demo mode / no GitHub write operation` ではなく `GitHub App configured / selected repo mode` を表示する
 
+同じ確認を script で実行できます。
+
+```bash
+pnpm --filter @git-ai-ide/worker test:github-real
+```
+
+この command は、書き込みをしない read-only smoke test として `/api/github/setup`、`/api/github/installations`、`/api/github/repos` を確認します。
+
+branch push と PR 作成まで確認する場合だけ、明示的に書き込みを有効にします。
+
+```bash
+GITHUB_E2E_WRITE=1 \
+GITHUB_E2E_REPOSITORY=owner/repo \
+GITHUB_E2E_ISSUE_NUMBER=54 \
+pnpm --filter @git-ai-ide/worker test:github-real
+```
+
+必要に応じて次の環境変数で対象を固定できます。
+
+- `GIT_AI_IDE_WORKER_URL`: Worker URL。既定値は `http://127.0.0.1:8787`
+- `GITHUB_E2E_INSTALLATION_ID`: installation を固定する
+- `GITHUB_E2E_REPOSITORY`: repository を固定する
+- `GITHUB_E2E_BASE_BRANCH`: base branch を固定する
+- `GITHUB_E2E_BRANCH`: 作成する branch 名を固定する
+- `GITHUB_E2E_WRITE`: `1` のときだけ branch push / PR 作成を行う
+
 ## Cloudflare に deploy して確認する場合
 
 Cloudflare 上で確認する場合は、先に Wrangler の認証が必要です。
