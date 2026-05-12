@@ -162,6 +162,7 @@ export function App() {
   const [previewTabOpen, setPreviewTabOpen] = useState(false);
   const [editorView, setEditorView] = useState<EditorView>("file");
   const [previewUrl, setPreviewUrl] = useState("");
+  const [previewAddress, setPreviewAddress] = useState("http://localhost:5173");
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
   const [prDraftMarkdown, setPrDraftMarkdown] = useState("");
@@ -1070,7 +1071,21 @@ export function App() {
     setPreviewLog(result.log);
     setPreviewMode(result.mode);
     setPreviewUrl(result.url ?? "");
+    if (result.url) setPreviewAddress(result.url);
     setPreviewRunState(result.ok ? "ready" : "idle");
+  };
+
+  const openPreviewAddress = () => {
+    const trimmed = previewAddress.trim();
+    if (!trimmed) return;
+    const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`;
+
+    setPreviewAddress(normalized);
+    setPreviewUrl(normalized);
+    setPreviewRunState("ready");
+    setPreviewTabOpen(true);
+    setEditorView("preview");
+    setDiffOpen(false);
   };
 
   const pushBranch = async () => {
@@ -1822,13 +1837,16 @@ export function App() {
             ) : editorView === "preview" && previewTabOpen ? (
               <div className="editor-preview-card">
                 <LocalPreviewPanel
+                  onOpenPreviewAddress={openPreviewAddress}
                   previewAvailable={previewAvailable}
+                  previewAddress={previewAddress}
                   previewCommand={previewCommand}
                   previewLog={previewLog}
                   previewMode={previewMode}
                   previewPreflight={previewPreflight}
                   previewRunState={previewRunState}
                   previewUrl={previewUrl}
+                  setPreviewAddress={setPreviewAddress}
                   workspaceName={workspaceName}
                 />
               </div>
@@ -2163,24 +2181,40 @@ function PanelTitle({ title }: { title: string }) {
 }
 
 function LocalPreviewPanel({
+  onOpenPreviewAddress,
   previewAvailable,
+  previewAddress,
   previewRunState,
   previewUrl,
+  setPreviewAddress,
   workspaceName,
 }: {
+  onOpenPreviewAddress: () => void;
   previewAvailable: boolean;
+  previewAddress: string;
   previewCommand: string | undefined;
   previewLog: string;
   previewMode: "candidate" | "recorded" | "webcontainer";
   previewPreflight: ReturnType<typeof createLocalPreviewPreflight>;
   previewRunState: "idle" | "running" | "ready";
   previewUrl: string;
+  setPreviewAddress: (value: string) => void;
   workspaceName: string;
 }) {
   const recordedPreviewHtml = createRecordedPreviewHtml(workspaceName, previewRunState);
 
   return (
     <div className="preview-panel">
+      <form
+        className="preview-addressbar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onOpenPreviewAddress();
+        }}
+      >
+        <input aria-label="Preview URL" onChange={(event) => setPreviewAddress(event.target.value)} placeholder="http://localhost:5173" value={previewAddress} />
+        <button className="button secondary" type="submit">開く</button>
+      </form>
       {previewUrl ? (
         <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
       ) : previewAvailable ? (

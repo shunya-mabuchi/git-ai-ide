@@ -76,6 +76,7 @@ test.describe("Git AI IDE workflow", () => {
 
     await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-panel")).toBeVisible();
+    await expect(page.getByLabel("Preview URL")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-iframe")).toBeVisible();
     await expect(page.locator(".editor-surface")).not.toContainText("Preview diagnostics");
 
