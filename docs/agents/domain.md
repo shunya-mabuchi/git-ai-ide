@@ -10,8 +10,8 @@
 - **Diff Review**: patch apply や commit 前に確認する Monaco diff view。
 - **Safety Gate**: Branch Goal、context、model capability、patch review、test、commit draft、PR draft、未解決 warning を確認する soft gate。
 - **Recorded AI**: model setup なしでも demo が成立する deterministic fallback。
-- **WebLLM**: 小さな task を browser-local model で処理する runtime path。
-- **Ollama fallback**: より大きな task を local desktop model で処理する runtime path。
+- **WebLLM**: 小さな task を browser-local model で処理する runtime path。端末性能と task に応じて候補 model を絞る。
+- **Ollama legacy diagnostic**: 主機能から外した localhost LLM 検証経路。通常 UI では推奨しない。
 - **Runtime Plan**: WebContainer candidate や recorded fallback など、実行可能性を検出した結果。
 
 ## 安全原則
@@ -49,4 +49,4 @@ GitHub:
 
 Demo mode は first-class product mode です。setup なしでも安定して review できるようにするために存在します。
 
-ただし、demo は必ず demo と表示します。本物の GitHub、WebLLM、Ollama、WebContainer 実行として説明してはいけません。
+ただし、demo は必ず demo と表示します。本物の GitHub、WebLLM、WebContainer 実行として説明してはいけません。

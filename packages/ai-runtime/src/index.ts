@@ -207,7 +207,7 @@ export async function detectBrowserAiRuntime(input?: {
         status: ollama.available ? "available" : "unavailable",
       },
     ],
-    recommendedProvider: ollama.available ? "ollama" : webGpuAvailable ? "webllm" : "recorded",
+    recommendedProvider: webGpuAvailable ? "webllm" : "recorded",
     webGpuAvailable,
   });
 }
@@ -274,11 +274,6 @@ export function chooseExecutionMode(input: {
   if (input.preferredMode) return input.preferredMode;
 
   const budgetRatio = input.context.tokenBudget.used / input.context.tokenBudget.limit;
-  const complexTask = input.task === "single_file_patch" || input.task === "branch_review";
-
-  if ((complexTask || budgetRatio > 0.85 || input.context.gitChangeCount > 8) && input.ollamaAvailable) {
-    return "ollama";
-  }
 
   if (input.webGpuAvailable && budgetRatio < 0.65 && input.context.gitChangeCount <= 2) {
     return "webllm";
@@ -304,7 +299,7 @@ export function runRecordedTask(request: AiTaskRequest): AiTaskResult {
     summary: taskLabels[request.task],
     warnings:
       request.context.tokenBudget.used > request.context.tokenBudget.limit
-        ? ["context budget を超えています。優先度を下げるか Ollama を使ってください。"]
+        ? ["context budget を超えています。優先度を下げるか、端末に合う WebLLM model を選択してください。"]
         : [],
   };
 }

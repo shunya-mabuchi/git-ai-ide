@@ -8,7 +8,8 @@
 - [デプロイ手順](deployment.md): Cloudflare Pages / Workers / D1 で公開する手順
 - [GitHub App セットアップ](github-app-setup.md): selected repository only の GitHub App 設定
 - [環境設計](environment.md): ローカル開発、runtime、保存対象の考え方
-- [Runtime 実機確認ログ](runtime-real-e2e-check.md): WebLLM / Ollama の実機確認結果と再実行手順
+- [Runtime 実機確認ログ](runtime-real-e2e-check.md): WebLLM / WebContainer の実機確認結果と再実行手順
+- [WebLLM model routing](webllm-model-routing.md): 端末性能と task に応じて model 候補を絞る方針
 
 ## 状態・ロードマップ
 

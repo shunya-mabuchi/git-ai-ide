@@ -1010,3 +1010,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
   - PR #44 を作成済み
+
+## GAI-044: WebLLM モデルルーティングと WebContainer preview 方針を更新する
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:ai-runtime`, `領域:runtime`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/91
+- 背景: WebLLM は残すが CDN import をやめ、npm dependency として扱う。Local Preview は WebContainer を主軸にするが、すべての repo が動くとは説明せず best-effort と明記する必要がある。Ollama は主機能から外し、削除候補または legacy diagnostic として扱う。
+- スコープ:
+  - WebLLM SDK を npm dependency 化し、実行時だけ読み込む
+  - 端末性能、task、候補 model catalog に基づいて表示候補を絞る
+  - Ollama を通常 UI / 自動推奨から外す
+  - WebContainer preview を主軸としつつ best-effort / fallback / diagnostics を強化する
+  - README / docs / runtime log を現方針へ更新する
+- 受け入れ条件:
+  - WebLLM model load 診断が選択 model id を使う
+  - 端末に合わない model が通常候補に出にくい
+  - Local Preview が WebContainer best-effort であることが docs と UI から分かる
+  - Ollama が通常の model routing UI から外れている
+  - typecheck / unit test / build / E2E が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功

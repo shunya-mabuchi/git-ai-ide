@@ -89,7 +89,7 @@ Callback / install まわりの詳細は [GitHub App セットアップ](github-
 
 - LLM 推論をサーバーで実行しない
 - WebLLM はユーザーのブラウザで実行する
-- Ollama はユーザーの localhost で実行する
+- Recorded AI fallback は setup なしで実行する
 - Worker は GitHub proxy と metadata API に限定する
 - D1 には code / diff / prompt 全文を保存しない
 - Demo mode は外部 API なしで動く
@@ -110,5 +110,5 @@ Callback / install まわりの詳細は [GitHub App セットアップ](github-
 
 - WebContainer は cross-origin isolation とブラウザ対応状況に依存します
 - WebLLM は端末性能と WebGPU 対応状況に依存します
-- Ollama はユーザーのローカル環境で起動している必要があります
+- WebLLM が使えない端末では Recorded AI fallback に切り替わります
 - 任意 repo の runtime checks は best effort です

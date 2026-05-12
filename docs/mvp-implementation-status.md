@@ -40,7 +40,8 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 - Context Pack budget meter
 - task priority: Fast / Balanced / Deep
 - selected file / changed files / assisted memory を Context Pack に反映
-- runtime routing: Recorded AI / WebLLM / Ollama
+- runtime routing: Recorded AI / WebLLM
+- WebLLM model catalog / device-aware routing
 - runtime suggestion
 - editable Branch Goal
 - editable Assisted Memory
@@ -70,11 +71,10 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 ## 実 credentials / 実 runtime が必要なもの
 
 - WebLLM 実モデルロード
-- Ollama 実接続
 - WebContainer 実行
 - Cloudflare deploy URL での GitHub App / Worker / D1 結合確認
 
-GitHub App の local real E2E は完了済みです。WebLLM / Ollama / WebContainer は端末やブラウザ機能に依存するため、通常 CI では fallback を確認し、対応環境で明示的に実 E2E を実行します。
+GitHub App の local real E2E は完了済みです。WebLLM / WebContainer は端末やブラウザ機能に依存するため、通常 CI では fallback を確認し、対応環境で明示的に実 E2E を実行します。
 
 ## 設計上のポイント
 
@@ -89,5 +89,4 @@ GitHub App の local real E2E は完了済みです。WebLLM / Ollama / WebConta
 1. Cloudflare deploy URL で Worker / D1 / GitHub App secrets を確認
 2. WebContainer install / dev server iframe preview の実 E2E
 3. WebLLM model loading の実 E2E
-4. Ollama localhost 接続の実 E2E
-5. isomorphic-git の実 filesystem 連携
+4. isomorphic-git の実 filesystem 連携

@@ -55,7 +55,7 @@ describe("createLocalPreviewPreflight", () => {
       mode: "webcontainer",
     });
     expect(preflight.items.every((item) => item.status === "pass")).toBe(true);
-    expect(preflight.reason).toBe("WebContainer dev server URL を iframe に接続します。");
+    expect(preflight.reason).toBe("WebContainer dev server URL を iframe に best-effort で接続します。");
   });
 
   it("records why preview falls back when browser isolation is missing", () => {

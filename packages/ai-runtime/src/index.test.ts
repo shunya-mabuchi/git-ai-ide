@@ -34,7 +34,7 @@ describe("detectBrowserAiRuntime", () => {
     expect(status.providers.find((provider) => provider.provider === "webllm")?.status).toBe("available");
   });
 
-  it("recommends Ollama when localhost models are detected", async () => {
+  it("detects Ollama without making it the default recommendation", async () => {
     const status = await detectBrowserAiRuntime({
       fetchImpl: async () =>
         new Response(
@@ -47,7 +47,7 @@ describe("detectBrowserAiRuntime", () => {
       timeoutMs: 10,
     });
 
-    expect(status.recommendedProvider).toBe("ollama");
+    expect(status.recommendedProvider).toBe("recorded");
     expect(status.ollamaAvailable).toBe(true);
     expect(status.providers.find((provider) => provider.provider === "ollama")?.modelIds).toEqual(["qwen2.5-coder:7b"]);
     expect(status.models.some((model) => model.modelId === "qwen2.5-coder:7b")).toBe(true);

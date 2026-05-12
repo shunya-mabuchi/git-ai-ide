@@ -18,6 +18,7 @@
     "@git-ai-ide/git-core": "workspace:*",
     "@git-ai-ide/patch-core": "workspace:*",
     "@git-ai-ide/shared": "workspace:*",
+    "@mlc-ai/web-llm": "^0.2.83",
     "@monaco-editor/react": "^4.7.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@webcontainer/api": "^1.6.4",
