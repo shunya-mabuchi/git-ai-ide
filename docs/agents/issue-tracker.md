@@ -17,6 +17,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-037: File operations の dirty / save / Git diff 同期を完成させる
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:workflow-safety`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/70
+- 背景: IDE としてファイル作成・改名・削除だけでなく、編集後の未保存状態、保存操作、Git diff との関係が分かる必要がある。
+- スコープ:
+  - file create / rename / delete に加えて folder create を追加する
+  - editor tab / Explorer に未保存状態を表示する
+  - 保存 / すべて保存を追加し、保存状態と Git baseline を分離する
+  - Git panel の diff 表示が file operation / editor edit と同期することを E2E で確認する
+- 受け入れ条件:
+  - 編集中のファイルに dirty indicator が出る
+  - 保存すると dirty indicator は消えるが Git diff は残る
+  - フォルダ作成が Explorer と Git diff に反映される
+  - typecheck / unit test / build / E2E が通る
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+
 ## GAI-001: 正式リポジトリ配置と Agent workflow を整備する
 
 - 状態: 完了

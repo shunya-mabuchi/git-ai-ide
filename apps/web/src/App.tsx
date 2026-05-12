@@ -8,6 +8,7 @@ import {
   FilePlus2,
   Files,
   Folder,
+  FolderPlus,
   FolderOpen,
   GitBranch,
   GitPullRequest,
@@ -15,6 +16,7 @@ import {
   Merge,
   Pencil,
   Play,
+  Save,
   Search,
   ShieldCheck,
   TriangleAlert,
@@ -137,6 +139,7 @@ export function App() {
   const [editorTarget, setEditorTarget] = useState<{ file: FileName; line: number } | null>(null);
   const [files, setFiles] = useState<Record<string, string>>(demoFiles);
   const [baselineFiles, setBaselineFiles] = useState<Record<string, string>>(demoFiles);
+  const [savedFiles, setSavedFiles] = useState<Record<string, string>>(demoFiles);
   const [workspaceName, setWorkspaceName] = useState("PR Helper Mini");
   const [workspaceSource, setWorkspaceSource] = useState<WorkspaceSnapshot["source"]>("demo");
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
@@ -174,10 +177,12 @@ export function App() {
   const [branchName, setBranchName] = useState("feature/pr-summary");
   const [branchGoalMarkdown, setBranchGoalMarkdown] = useState(demoBranchGoal.markdown);
   const [newFilePath, setNewFilePath] = useState("src/features/pr-summary/notes.md");
+  const [newFolderPath, setNewFolderPath] = useState("src/features/pr-summary/docs");
   const [renameFilePath, setRenameFilePath] = useState("src/features/pr-summary/generateSummary.ts");
   const [mergeTargetBranch, setMergeTargetBranch] = useState("main");
   const [conflictDemoEnabled, setConflictDemoEnabled] = useState(false);
   const [fileOperationMessage, setFileOperationMessage] = useState("選択中のファイルに対して作成・改名・削除できます。");
+  const [lastSavedAt, setLastSavedAt] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
   const [commitCreated, setCommitCreated] = useState(false);
   const [branchPushed, setBranchPushed] = useState(false);
@@ -322,6 +327,7 @@ export function App() {
         if (!snapshot || cancelled) return;
         setFiles(snapshot.files);
         setBaselineFiles(snapshot.files);
+        setSavedFiles(snapshot.files);
         setWorkspaceName(snapshot.name);
         setWorkspaceSource(snapshot.source);
         const preferredFile = selectPreferredFile(snapshot.files);
@@ -386,6 +392,8 @@ export function App() {
     [baselineFiles, branchName, files],
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
+  const dirtyFiles = useMemo(() => createDirtyFileSet(savedFiles, files), [files, savedFiles]);
+  const selectedFileDirty = dirtyFiles.has(selectedFile);
   const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
   const selectedRepositoryOption = githubRepositories.find((repository) => repository.fullName === selectedRepository);
   const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
@@ -956,10 +964,54 @@ export function App() {
       ...currentFiles,
       [nextPath]: content,
     }));
+    setSavedFiles((currentFiles) => ({
+      ...currentFiles,
+      [nextPath]: content,
+    }));
     openFile(nextPath);
     setDiffFile(nextPath);
     setNewFilePath(suggestSiblingFilePath(nextPath));
     setFileOperationMessage(`${nextPath} を作成しました。`);
+    resetWorkflowAfterFileOperation();
+  };
+
+  const createWorkspaceFolder = () => {
+    const nextFolder = normalizeWorkspacePath(newFolderPath).replace(/\/+$/, "");
+
+    if (!nextFolder) {
+      setFileOperationMessage("作成するフォルダパスを入力してください。");
+      return;
+    }
+
+    const placeholderFile = `${nextFolder}/.gitkeep`;
+
+    if (files[placeholderFile] !== undefined || fileNames.some((file) => file.startsWith(`${nextFolder}/`))) {
+      setFileOperationMessage(`${nextFolder} はすでに存在します。`);
+      return;
+    }
+
+    setFiles((currentFiles) => ({
+      ...currentFiles,
+      [placeholderFile]: "",
+    }));
+    setSavedFiles((currentFiles) => ({
+      ...currentFiles,
+      [placeholderFile]: "",
+    }));
+    setExpandedFolders((current) => {
+      const next = new Set(current);
+      const parts = nextFolder.split("/");
+      let path = "";
+      for (const part of parts) {
+        path = path ? `${path}/${part}` : part;
+        next.add(path);
+      }
+      return next;
+    });
+    openFile(placeholderFile);
+    setDiffFile(placeholderFile);
+    setNewFolderPath(suggestSiblingFolderPath(nextFolder));
+    setFileOperationMessage(`${nextFolder} を作成しました。`);
     resetWorkflowAfterFileOperation();
   };
 
@@ -993,6 +1045,13 @@ export function App() {
         [nextPath]: currentContent ?? "",
       };
     });
+    setSavedFiles((currentFiles) => {
+      const { [selectedFile]: currentContent, ...rest } = currentFiles;
+      return {
+        ...rest,
+        [nextPath]: currentContent ?? files[selectedFile] ?? "",
+      };
+    });
     setOpenFiles((currentFiles) => currentFiles.map((file) => (file === selectedFile ? nextPath : file)));
     setSelectedFile(nextPath);
     setDiffFile(nextPath);
@@ -1021,6 +1080,10 @@ export function App() {
       const { [deletedFile]: _deletedContent, ...rest } = currentFiles;
       return rest;
     });
+    setSavedFiles((currentFiles) => {
+      const { [deletedFile]: _deletedContent, ...rest } = currentFiles;
+      return rest;
+    });
     setOpenFiles((currentFiles) => {
       const remainingOpenFiles = currentFiles.filter((file) => file !== deletedFile);
       return remainingOpenFiles.length > 0 ? remainingOpenFiles : [fallbackFile];
@@ -1031,6 +1094,26 @@ export function App() {
     setDiffOpen(true);
     setFileOperationMessage(`${deletedFile} を削除しました。`);
     resetWorkflowAfterFileOperation();
+  };
+
+  const saveCurrentFile = () => {
+    if (!selectedFile || files[selectedFile] === undefined) {
+      setFileOperationMessage("保存するファイルを Explorer で選択してください。");
+      return;
+    }
+
+    setSavedFiles((currentFiles) => ({
+      ...currentFiles,
+      [selectedFile]: files[selectedFile],
+    }));
+    setLastSavedAt(new Date().toISOString());
+    setFileOperationMessage(`${selectedFile} を保存しました。`);
+  };
+
+  const saveAllFiles = () => {
+    setSavedFiles(files);
+    setLastSavedAt(new Date().toISOString());
+    setFileOperationMessage(`${dirtyFiles.size} 件の未保存変更を保存しました。`);
   };
 
   const toggleSidePanel = (mode: SidePanelMode) => {
@@ -1240,6 +1323,7 @@ export function App() {
       const snapshot = await openLocalDirectorySnapshot();
       setFiles(snapshot.files);
       setBaselineFiles(snapshot.files);
+      setSavedFiles(snapshot.files);
       setWorkspaceName(snapshot.name);
       setWorkspaceSource(snapshot.source);
       const preferredFile = selectPreferredFile(snapshot.files);
@@ -1273,6 +1357,7 @@ export function App() {
   const restoreDemoWorkspace = () => {
     setFiles(demoFiles);
     setBaselineFiles(demoFiles);
+    setSavedFiles(demoFiles);
     setWorkspaceName("PR Helper Mini");
     setWorkspaceSource("demo");
     openFile("src/features/pr-summary/generateSummary.ts");
@@ -1365,6 +1450,7 @@ export function App() {
     setPushedCommitSha("");
     setCreatedPrUrl("");
     setBaselineFiles(files);
+    setSavedFiles(files);
     setPatchApplied(false);
     setPrDraftGenerated(false);
     setBottomPanelMode("output");
@@ -1534,6 +1620,14 @@ export function App() {
                         <span>作成</span>
                       </button>
                       <label>
+                        <span>New folder</span>
+                        <input value={newFolderPath} onChange={(event) => setNewFolderPath(event.target.value)} />
+                      </label>
+                      <button className="icon-action" title="フォルダを作成" onClick={createWorkspaceFolder}>
+                        <FolderPlus size={15} />
+                        <span>作成</span>
+                      </button>
+                      <label>
                         <span>Rename selected</span>
                         <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
                       </label>
@@ -1552,6 +1646,7 @@ export function App() {
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
                     <nav className="file-list">
                       <ExplorerTree
+                        dirtyFiles={dirtyFiles}
                         expandedFolders={expandedFolders}
                         nodes={explorerTree}
                         onSelectFile={(file) => {
@@ -1887,7 +1982,7 @@ export function App() {
                   setEditorView("file");
                 }}
               >
-                <span>{basename(file)}</span>
+                <span>{basename(file)}{dirtyFiles.has(file) ? " *" : ""}</span>
                 <X
                   size={13}
                   onClick={(event) => {
@@ -1916,6 +2011,18 @@ export function App() {
                 />
               </button>
             ) : null}
+            <div className="editor-tab-actions">
+              <span>{selectedFileDirty ? "未保存" : "保存済み"}</span>
+              {lastSavedAt ? <span>{formatDateTime(lastSavedAt)}</span> : null}
+              <button className="icon-action compact" disabled={!selectedFileDirty} onClick={saveCurrentFile}>
+                <Save size={14} />
+                <span>保存</span>
+              </button>
+              <button className="icon-action compact" disabled={dirtyFiles.size === 0} onClick={saveAllFiles}>
+                <Save size={14} />
+                <span>すべて保存</span>
+              </button>
+            </div>
           </div>
 
           <div className="editor-surface">
@@ -2404,12 +2511,14 @@ function escapeHtml(value: string) {
 }
 
 function ExplorerTree({
+  dirtyFiles,
   expandedFolders,
   nodes,
   onSelectFile,
   onToggleFolder,
   selectedFile,
 }: {
+  dirtyFiles: Set<string>;
   expandedFolders: Set<string>;
   nodes: ExplorerNode[];
   onSelectFile: (file: string) => void;
@@ -2420,6 +2529,7 @@ function ExplorerTree({
     <>
       {nodes.map((node) => (
         <ExplorerTreeNode
+          dirtyFiles={dirtyFiles}
           expandedFolders={expandedFolders}
           key={node.path}
           node={node}
@@ -2434,6 +2544,7 @@ function ExplorerTree({
 
 function ExplorerTreeNode({
   depth = 0,
+  dirtyFiles,
   expandedFolders,
   node,
   onSelectFile,
@@ -2441,6 +2552,7 @@ function ExplorerTreeNode({
   selectedFile,
 }: {
   depth?: number;
+  dirtyFiles: Set<string>;
   expandedFolders: Set<string>;
   node: ExplorerNode;
   onSelectFile: (file: string) => void;
@@ -2461,6 +2573,7 @@ function ExplorerTreeNode({
           ? node.children.map((child) => (
               <ExplorerTreeNode
                 depth={depth + 1}
+                dirtyFiles={dirtyFiles}
                 expandedFolders={expandedFolders}
                 key={child.path}
                 node={child}
@@ -2482,6 +2595,7 @@ function ExplorerTreeNode({
     >
       <File size={14} />
       <span>{node.name}</span>
+      {dirtyFiles.has(node.path) ? <span className="dirty-dot" aria-label="未保存の変更" /> : null}
     </button>
   );
 }
@@ -2660,6 +2774,12 @@ function suggestSiblingFilePath(fileName: string) {
   return directory ? `${directory}/new-file.md` : "new-file.md";
 }
 
+function suggestSiblingFolderPath(folderName: string) {
+  const directory = dirname(`${folderName}/placeholder`);
+  const parent = dirname(directory);
+  return parent ? `${parent}/new-folder` : "new-folder";
+}
+
 function selectPreferredFile(files: Record<string, string>) {
   const fileNames = Object.keys(files).sort();
   return (
@@ -2669,6 +2789,19 @@ function selectPreferredFile(files: Record<string, string>) {
     fileNames[0] ??
     ""
   );
+}
+
+function createDirtyFileSet(savedFiles: Record<string, string>, workingFiles: Record<string, string>) {
+  const fileNames = new Set([...Object.keys(savedFiles), ...Object.keys(workingFiles)]);
+  const dirtyFiles = new Set<string>();
+
+  for (const fileName of fileNames) {
+    if (savedFiles[fileName] !== workingFiles[fileName]) {
+      dirtyFiles.add(fileName);
+    }
+  }
+
+  return dirtyFiles;
 }
 
 function workspaceSourceLabel(source: WorkspaceSnapshot["source"]) {

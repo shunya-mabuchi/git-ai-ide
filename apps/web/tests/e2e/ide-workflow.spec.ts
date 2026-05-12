@@ -15,6 +15,11 @@ test.describe("Git AI IDE workflow", () => {
 
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-note.md" })).toBeVisible();
 
+    const newFolderInput = page.locator(".file-operation-panel input").nth(1);
+    await newFolderInput.fill("src/features/pr-summary/e2e-folder");
+    await page.getByTitle("フォルダを作成").click();
+    await expect(page.locator(".file-list").getByRole("button", { name: "e2e-folder" })).toBeVisible();
+
     await page.getByLabel("Git").click();
     const githubBox = page.locator(".github-box");
     await expect(page.getByText("Demo Source Control")).toBeVisible();
@@ -29,9 +34,29 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByText("Merge readiness")).toBeVisible();
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByRole("button", { name: /e2e-note\.md added/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /e2e-folder\/\.gitkeep added/ })).toBeVisible();
 
     await page.getByRole("button", { name: "競合デモ" }).click();
     await expect(page.getByText("Conflict handling")).toBeVisible();
+  });
+
+  test("編集 dirty と保存状態は Git diff と分離して扱える", async ({ page }) => {
+    await page.goto("/");
+
+    await page.locator(".monaco-editor").click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.type("export function generateSummary() { return 'edited by e2e'; }\n");
+
+    await expect(page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts *" })).toBeVisible();
+    await expect(page.locator(".editor-tab-actions")).toContainText("未保存");
+
+    await page.locator(".editor-tab-actions").getByRole("button", { name: /^保存$/ }).click();
+
+    await expect(page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts *" })).toHaveCount(0);
+    await expect(page.locator(".editor-tab-actions")).toContainText("保存済み");
+
+    await page.getByLabel("Git").click();
+    await expect(page.getByRole("button", { name: /generateSummary\.ts modified/ })).toBeVisible();
   });
 
   test("WebLLM model load 診断は WebGPU 非対応環境で fallback reason を表示する", async ({ page }) => {
@@ -57,7 +82,7 @@ test.describe("Git AI IDE workflow", () => {
 
     const memoryEditor = page.locator(".memory-editor");
     await memoryEditor.fill("PR description では reviewer が見る risk と test plan を先に書く。");
-    await page.getByRole("button", { name: "保存" }).click();
+    await page.locator(".assistant-panel").getByRole("button", { name: /^保存$/ }).click();
     await expect(page.getByText("project:")).toBeVisible();
 
     await page.reload();
