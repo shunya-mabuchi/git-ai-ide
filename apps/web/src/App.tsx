@@ -38,6 +38,7 @@ import {
   loadGitHubCommits,
   loadGitHubInstallations,
   loadGitHubRepositories,
+  loadGitHubRepositoryFiles,
   loadGitHubSetup,
   pushGitHubFiles,
   type GitHubBranchOption,
@@ -259,6 +260,7 @@ export function App() {
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
   const [isLoadingGitHubRepositories, setIsLoadingGitHubRepositories] = useState(false);
+  const [isOpeningGitHubRepository, setIsOpeningGitHubRepository] = useState(false);
   const [isLoadingRemoteGit, setIsLoadingRemoteGit] = useState(false);
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [isPushingBranch, setIsPushingBranch] = useState(false);
@@ -477,6 +479,25 @@ export function App() {
   const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
   const selectedRepositoryOption = githubRepositories.find((repository) => repository.fullName === selectedRepository);
   const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
+  const canOpenSelectedGitHubRepository = realGitHubMode && Boolean(selectedRepositoryOption?.installationId);
+  const githubConnectionTitle = !githubConfigured
+    ? "GitHub App をインストールしてください"
+    : !selectedInstallationId
+      ? "GitHub App installation を選択してください"
+      : !repositoryIsSelectable
+        ? "GitHub repository を選択してください"
+        : fileNames.length > 0
+          ? `${selectedRepository} を開いています`
+          : "GitHub repository を開けます";
+  const githubConnectionDetail = !githubConfigured
+    ? "この IDE は GitHub App を使い、選択した repository だけに branch 作成、push、PR 作成の権限を付与します。"
+    : !selectedInstallationId
+      ? "GitHub の install 画面で Only select repositories を選び、使いたい repository だけを許可してください。"
+      : !repositoryIsSelectable
+        ? "Installation に紐づく repository を読み込めていません。GitHub App の repository access を確認してください。"
+        : fileNames.length > 0
+          ? "Explorer と Source Control は、この selected repository の snapshot を表示しています。"
+          : "選択済み repository の text files を読み込むと、Explorer と editor が表示されます。";
   const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "GitHub connection required";
   const sourceControlModeDetail = realGitHubMode
     ? "選択した GitHub repository に branch push / PR 作成を行います。"
@@ -1276,6 +1297,61 @@ export function App() {
       setGithubStatusMessage(error instanceof Error ? error.message : "GitHub repositories を取得できませんでした。");
     } finally {
       setIsLoadingGitHubRepositories(false);
+    }
+  };
+
+  const openSelectedGitHubRepository = async () => {
+    if (!selectedRepositoryOption?.installationId) {
+      setGithubStatusMessage("GitHub App installation と repository を選択してください。");
+      return;
+    }
+
+    setIsOpeningGitHubRepository(true);
+    setWorkspaceError("");
+    setGithubStatusMessage(`${selectedRepositoryOption.fullName} を読み込み中`);
+
+    try {
+      const result = await loadGitHubRepositoryFiles({
+        defaultBranch: selectedRepositoryOption.defaultBranch,
+        installationId: selectedRepositoryOption.installationId,
+        repository: selectedRepositoryOption.fullName,
+      });
+      const preferredFile = selectPreferredFile(result.files);
+
+      if (!preferredFile) {
+        setWorkspaceError("この repository から表示できる text file を取得できませんでした。repository access または file size を確認してください。");
+        setGithubStatusMessage("Repository files を取得できませんでした");
+        return;
+      }
+
+      setFiles(result.files);
+      setBaselineFiles(result.files);
+      setSavedFiles(result.files);
+      setWorkspaceName(selectedRepositoryOption.fullName);
+      setWorkspaceSource("indexeddb");
+      setBranchName(selectedRepositoryOption.defaultBranch);
+      setMergeTargetBranch(selectedRepositoryOption.defaultBranch);
+      setSelectedFile(preferredFile);
+      setOpenFiles([preferredFile]);
+      setDiffFile(preferredFile);
+      setDiffOpen(false);
+      setEditorView("file");
+      setPatchApplied(false);
+      setTestsRun(false);
+      setCommitCreated(false);
+      setBranchPushed(false);
+      setCreatedPrUrl("");
+      setGithubStatusMessage(
+        `${selectedRepositoryOption.fullName} を開きました。${Object.keys(result.files).length} files loaded${
+          result.skipped ? ` / ${result.skipped} files skipped` : ""
+        }`,
+      );
+      void refreshRemoteGit({ branch: selectedRepositoryOption.defaultBranch, repository: selectedRepositoryOption });
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "GitHub repository を開けませんでした。");
+      setGithubStatusMessage(error instanceof Error ? error.message : "GitHub repository を開けませんでした。");
+    } finally {
+      setIsOpeningGitHubRepository(false);
     }
   };
 
@@ -2207,9 +2283,76 @@ export function App() {
               </div>
             ) : (
               <div className="workspace-empty-state">
-                <strong>Repository を開いてください</strong>
-                <p>GitHub App で selected repository を接続するか、ローカルフォルダを開くと file tree と editor が表示されます。</p>
-                <div>
+                <strong>{githubConnectionTitle}</strong>
+                <p>{githubConnectionDetail}</p>
+                <ol className="connection-steps">
+                  <li className={githubConfigured ? "complete" : "active"}>
+                    <span>1</span>
+                    <div>
+                      <strong>GitHub App をインストール</strong>
+                      <p>Only select repositories で、この IDE から操作したい repo だけを許可します。</p>
+                    </div>
+                  </li>
+                  <li className={selectedInstallationId ? "complete" : githubConfigured ? "active" : ""}>
+                    <span>2</span>
+                    <div>
+                      <strong>Installation と repository を選択</strong>
+                      <p>GitHub App が install された account と、対象 repository を選びます。</p>
+                    </div>
+                  </li>
+                  <li className={fileNames.length > 0 ? "complete" : canOpenSelectedGitHubRepository ? "active" : ""}>
+                    <span>3</span>
+                    <div>
+                      <strong>Repository を IDE に開く</strong>
+                      <p>text files を snapshot として読み込み、Explorer と editor に表示します。</p>
+                    </div>
+                  </li>
+                </ol>
+                {githubConfigured ? (
+                  <div className="empty-repo-controls">
+                    <label>
+                      <span>Installation</span>
+                      <select
+                        disabled={githubInstallations.length === 0 || isLoadingGitHubRepositories || isOpeningGitHubRepository}
+                        value={selectedInstallationId ?? ""}
+                        onChange={(event) => {
+                          void selectGitHubInstallation(Number(event.target.value));
+                        }}
+                      >
+                        {githubInstallations.length === 0 ? <option value="">installation 未検出</option> : null}
+                        {githubInstallations.map((installation) => (
+                          <option key={installation.id} value={installation.id}>
+                            {installation.accountLogin}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Repository</span>
+                      <select
+                        disabled={githubRepositories.length === 0 || isLoadingGitHubRepositories || isOpeningGitHubRepository}
+                        value={selectedRepository}
+                        onChange={(event) => {
+                          const repository = githubRepositories.find((item) => item.fullName === event.target.value);
+                          setSelectedRepository(event.target.value);
+                          setSelectedInstallationId(repository?.installationId);
+                          if (repository?.defaultBranch) {
+                            setBranchName(repository.defaultBranch);
+                            setMergeTargetBranch(repository.defaultBranch);
+                          }
+                        }}
+                      >
+                        {githubRepositories.length === 0 ? <option value="">repository 未検出</option> : null}
+                        {githubRepositories.map((repository) => (
+                          <option key={repository.fullName} value={repository.fullName}>
+                            {repository.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : null}
+                <div className="empty-actions">
                   <button
                     className="button"
                     disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
@@ -2219,10 +2362,14 @@ export function App() {
                   </button>
                   {githubInstallUrl ? (
                     <a className="button secondary" href={githubInstallUrl} rel="noreferrer" target="_blank">
-                      GitHub App を接続
+                      {githubConfigured ? "GitHub App 設定を開く" : "GitHub App を接続"}
                     </a>
                   ) : null}
+                  <button className="button secondary" disabled={!canOpenSelectedGitHubRepository || isOpeningGitHubRepository} onClick={openSelectedGitHubRepository}>
+                    {isOpeningGitHubRepository ? "Repository 読み込み中" : "この repo を開く"}
+                  </button>
                 </div>
+                <p className="empty-state-note">{githubStatusMessage}</p>
               </div>
             )}
           </div>

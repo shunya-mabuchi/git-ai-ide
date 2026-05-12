@@ -12,6 +12,20 @@ export type GitHubRepositoryOption = {
   owner: string;
 };
 
+export type GitHubRepositoryFilesResult = {
+  files: Record<string, string>;
+  limits: {
+    maxFiles: number;
+    maxSingleFileBytes: number;
+    maxTotalBytes: number;
+  };
+  mode: "github";
+  ref: string;
+  repository: string;
+  skipped: number;
+  truncated: boolean;
+};
+
 export type GitHubInstallationOption = {
   accountLogin: string;
   id: number;
@@ -107,6 +121,25 @@ export async function loadGitHubRepositories(installationId?: number): Promise<G
     repositories: GitHubRepositoryOption[];
   };
   return body.repositories;
+}
+
+export async function loadGitHubRepositoryFiles(input: {
+  defaultBranch?: string;
+  installationId?: number;
+  repository: string;
+}): Promise<GitHubRepositoryFilesResult> {
+  const params = new URLSearchParams({
+    default_branch: input.defaultBranch ?? "main",
+    ref: input.defaultBranch ?? "main",
+    repository: input.repository,
+  });
+  if (input.installationId) params.set("installation_id", String(input.installationId));
+
+  const response = await fetch(`${workerBaseUrl}/api/github/files?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(await readGitHubApiError(response, "GitHub repository files を取得できませんでした。"));
+  }
+  return response.json();
 }
 
 export async function loadGitHubBranches(input: {

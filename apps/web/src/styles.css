@@ -1127,10 +1127,97 @@ button {
   max-width: 560px;
 }
 
-.workspace-empty-state div {
+.empty-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.connection-steps {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 4px 0;
+  max-width: 760px;
+  padding: 0;
+  width: min(760px, 100%);
+}
+
+.connection-steps li {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.connection-steps li > span {
+  align-items: center;
+  background: #202a33;
+  border: 1px solid #34414c;
+  border-radius: 999px;
+  color: #a8b3bd;
+  display: inline-flex;
+  font-size: 12px;
+  height: 24px;
+  justify-content: center;
+  margin-top: 2px;
+  width: 24px;
+}
+
+.connection-steps li.active > span {
+  background: #19446a;
+  border-color: #2d8fd5;
+  color: #e7f3fb;
+}
+
+.connection-steps li.complete > span {
+  background: #173f2f;
+  border-color: #2f9f69;
+  color: #dff7ea;
+}
+
+.connection-steps li strong {
+  color: #eef3f6;
+  display: block;
+  font-size: 13px;
+}
+
+.connection-steps li p {
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: none;
+}
+
+.empty-repo-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  max-width: 760px;
+  width: min(760px, 100%);
+}
+
+.empty-repo-controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.empty-repo-controls label span {
+  color: #a8b3bd;
+  font-size: 12px;
+}
+
+.empty-repo-controls select {
+  background: #151c22;
+  border: 1px solid #2a3742;
+  border-radius: 6px;
+  color: #eef3f6;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.empty-state-note {
+  color: #7f8b95;
+  font-size: 12px;
 }
 
 .editor-preview-card {

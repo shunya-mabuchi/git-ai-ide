@@ -17,6 +17,33 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-048: GitHub App 接続後の repository open flow を分かりやすくする
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/99
+- 背景: 一般ユーザーにとって、GitHub App install、installation 選択、repository 選択、repository を IDE に開く、という段階が UI 上で混ざって見える。接続済みでも初期画面が「Repository を開いてください」のままに見え、何が完了して何が未完了か分かりにくい。
+- スコープ:
+  - 初期画面を GitHub App 未接続 / install 済み / repo 選択済み / repo 読み込み状態に分ける
+  - selected repository を開く CTA を追加する
+  - Worker に selected repo の text files を取得する API を追加する
+  - Web UI から selected repo の file tree を読み込めるようにする
+  - 失敗時に Worker 未起動、secrets 未設定、installation 未選択、repo 権限なし、contents 取得失敗が分かる文言にする
+- 受け入れ条件:
+  - GitHub App を install 済みなら Installation / Repository / この repo を開く が初期画面に出る
+  - selected repo を開くと file tree と editor が表示される
+  - 通常 UI で GitHub App の意味と selected repo only の権限が分かる
+  - typecheck / build / E2E が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps\worker\node_modules\.bin\tsc.CMD --noEmit -p apps\worker\tsconfig.json` 成功
+  - `apps\web\node_modules\.bin\vitest.CMD run` 成功
+  - `apps\web\node_modules\.bin\vite.CMD build` 成功
+  - `apps\worker\node_modules\.bin\wrangler.CMD deploy --dry-run` 成功
+  - `apps\web\node_modules\.bin\playwright.CMD test` 成功
+  - browser smoke で GitHub App の 3 step、Only select repositories、`この repo を開く` が表示され、古い `Repository を開いてください` が出ないことを確認
+
 ## GAI-047: GitHub App 接続リンクを新タブで開く
 
 - 状態: 完了

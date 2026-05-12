@@ -36,6 +36,26 @@ type GitHubCommit = {
   url: string;
 };
 
+type GitHubTreeResponse = {
+  tree: Array<{
+    path: string;
+    sha: string;
+    size?: number;
+    type: "blob" | "tree" | string;
+  }>;
+  truncated: boolean;
+};
+
+type GitHubBlobResponse = {
+  content: string;
+  encoding: string;
+  size: number;
+};
+
+const maxRepositoryFiles = 80;
+const maxRepositoryBytes = 512_000;
+const maxSingleFileBytes = 80_000;
+
 const json = (data: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(data, null, 2), {
     ...init,
@@ -148,6 +168,45 @@ export default {
       }));
 
       return json({ mode: "github", repositories });
+    }
+
+    if (url.pathname === "/api/github/files" && request.method === "GET") {
+      const repository = url.searchParams.get("repository");
+      const installationId = Number(url.searchParams.get("installation_id"));
+      const ref = url.searchParams.get("ref") ?? url.searchParams.get("default_branch") ?? "main";
+
+      if (!repository) {
+        return json({ error: "repository is required" }, { status: 400 });
+      }
+
+      if (!isGitHubConfigured(env)) {
+        return json({ error: "GitHub App secrets are not configured." }, { status: 400 });
+      }
+
+      if (!installationId) {
+        return json({ error: "installation_id is required for GitHub mode" }, { status: 400 });
+      }
+
+      try {
+        const token = await createInstallationToken(env, installationId);
+        const result = await loadRepositoryTextFiles(token, repository, ref);
+        return json({
+          ...result,
+          mode: "github",
+          ref,
+          repository,
+        });
+      } catch (error) {
+        return json(
+          {
+            error:
+              error instanceof Error
+                ? `GitHub repository files を取得できませんでした: ${error.message}`
+                : "GitHub repository files を取得できませんでした。",
+          },
+          { status: 502 },
+        );
+      }
     }
 
     if (url.pathname === "/api/github/branches" && request.method === "GET") {
@@ -625,6 +684,69 @@ async function readBranchSha(token: string, repository: string, branch: string) 
   return body.object.sha;
 }
 
+async function loadRepositoryTextFiles(token: string, repository: string, ref: string) {
+  const treeResponse = await fetch(
+    `https://api.github.com/repos/${repository}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
+    {
+      headers: githubHeaders(token),
+    },
+  );
+
+  if (!treeResponse.ok) {
+    throw new Error(`tree API returned HTTP ${treeResponse.status}`);
+  }
+
+  const treeBody = (await treeResponse.json()) as GitHubTreeResponse;
+  const blobCount = treeBody.tree.filter((item) => item.type === "blob").length;
+  const candidates = treeBody.tree
+    .filter((item) => item.type === "blob")
+    .filter((item) => item.size !== undefined && item.size <= maxSingleFileBytes)
+    .filter((item) => isLikelyTextPath(item.path))
+    .sort((left, right) => compareRepositoryPath(left.path, right.path))
+    .slice(0, maxRepositoryFiles);
+
+  const files: Record<string, string> = {};
+  let totalBytes = 0;
+  let skippedByBudget = 0;
+
+  for (const item of candidates) {
+    const nextTotal = totalBytes + (item.size ?? 0);
+    if (nextTotal > maxRepositoryBytes) {
+      skippedByBudget += 1;
+      continue;
+    }
+
+    const blobResponse = await fetch(`https://api.github.com/repos/${repository}/git/blobs/${item.sha}`, {
+      headers: githubHeaders(token),
+    });
+
+    if (!blobResponse.ok) {
+      skippedByBudget += 1;
+      continue;
+    }
+
+    const blob = (await blobResponse.json()) as GitHubBlobResponse;
+    if (blob.encoding !== "base64") {
+      skippedByBudget += 1;
+      continue;
+    }
+
+    files[item.path] = base64DecodeUtf8(blob.content);
+    totalBytes = nextTotal;
+  }
+
+  return {
+    files,
+    limits: {
+      maxFiles: maxRepositoryFiles,
+      maxSingleFileBytes,
+      maxTotalBytes: maxRepositoryBytes,
+    },
+    skipped: Math.max(0, blobCount - candidates.length) + skippedByBudget,
+    truncated: treeBody.truncated,
+  };
+}
+
 async function writeContentChange(
   token: string,
   input: {
@@ -693,6 +815,26 @@ function encodePath(path: string) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
+function isLikelyTextPath(path: string) {
+  if (/(^|\/)(node_modules|dist|build|coverage|\.git|\.next|\.turbo)\//.test(path)) return false;
+  if (/\.(png|jpe?g|gif|webp|ico|pdf|zip|gz|tgz|woff2?|ttf|otf|mp4|mov|wasm)$/i.test(path)) return false;
+  if (/(^|\/)(README|LICENSE|CHANGELOG|Dockerfile|Makefile)$/i.test(path)) return true;
+  return /\.(ts|tsx|js|jsx|mjs|cjs|json|md|mdx|css|scss|html|yml|yaml|toml|txt|env\.example)$/i.test(path);
+}
+
+function compareRepositoryPath(left: string, right: string) {
+  return repositoryPathScore(left) - repositoryPathScore(right) || left.localeCompare(right);
+}
+
+function repositoryPathScore(path: string) {
+  if (/^README(\.|$)/i.test(path)) return 0;
+  if (path === "package.json") return 1;
+  if (path.startsWith("src/")) return 2;
+  if (path.startsWith("apps/") || path.startsWith("packages/")) return 3;
+  if (path.startsWith("docs/")) return 4;
+  return 5;
+}
+
 function base64Encode(text: string) {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
@@ -700,6 +842,15 @@ function base64Encode(text: string) {
     binary += String.fromCharCode(byte);
   });
   return btoa(binary);
+}
+
+function base64DecodeUtf8(value: string) {
+  const binary = atob(value.replace(/\s/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function githubHeaders(token: string) {
