@@ -47,6 +47,7 @@ import {
 } from "./workspace/localWorkspace";
 import { clearAssistedMemory, createAssistedMemoryProjectKey, loadAssistedMemory, saveAssistedMemory } from "./workspace/assistedMemory";
 import { createLocalPreviewPreflight, runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
+import { runWebLlmSmokeTest } from "./runtime/webLlmRuntime";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
@@ -190,6 +191,8 @@ export function App() {
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
   const [aiRuntimeStatus, setAiRuntimeStatus] = useState(createDefaultRuntimeStatus());
   const [aiRuntimeCheckState, setAiRuntimeCheckState] = useState<"checking" | "ready">("checking");
+  const [webLlmDiagnosticState, setWebLlmDiagnosticState] = useState<"idle" | "running">("idle");
+  const [webLlmDiagnosticLog, setWebLlmDiagnosticLog] = useState("WebLLM 実モデルロード診断はまだ実行していません。");
   const [ollamaDiagnosticState, setOllamaDiagnosticState] = useState<"idle" | "running">("idle");
   const [ollamaDiagnosticLog, setOllamaDiagnosticLog] = useState("Ollama E2E 診断はまだ実行していません。");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
@@ -827,6 +830,16 @@ export function App() {
     }
 
     setOllamaDiagnosticState("idle");
+  };
+
+  const runWebLlmDiagnostic = async () => {
+    setWebLlmDiagnosticState("running");
+    setWebLlmDiagnosticLog("WebLLM 実モデルロード診断を実行中...");
+
+    const result = await runWebLlmSmokeTest();
+    setWebLlmDiagnosticLog(result.log);
+    setAiRuntimeMode(result.mode);
+    setWebLlmDiagnosticState("idle");
   };
 
   const openChangedFileDiff = (file: string) => {
@@ -2036,6 +2049,10 @@ export function App() {
                   <strong>Suggestion: {runtimeLabels[runtimeSuggestion]}</strong>
                   <span>Selected: {selectedRuntimeLabel}</span>
                   <span>{aiRuntimeCheckState === "checking" ? "runtime を確認中" : selectedRuntimeHealth?.detail}</span>
+                  <button className="button secondary" disabled={webLlmDiagnosticState === "running"} onClick={runWebLlmDiagnostic}>
+                    {webLlmDiagnosticState === "running" ? "WebLLM 診断中" : "WebLLM model load 診断"}
+                  </button>
+                  <pre className="diagnostic-log">{webLlmDiagnosticLog}</pre>
                   <button className="button secondary" disabled={ollamaDiagnosticState === "running"} onClick={runOllamaDiagnostic}>
                     {ollamaDiagnosticState === "running" ? "Ollama 診断中" : "Ollama E2E 診断"}
                   </button>

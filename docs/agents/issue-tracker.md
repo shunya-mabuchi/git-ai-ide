@@ -717,6 +717,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - UI E2E で fallback 診断が壊れていないことを確認する
   - 実 Ollama 環境では script で `mode: ollama` を確認する
 
+## GAI-035: WebLLM 実モデルロード E2E を完了する
+
+- 状態: 進行中
+- ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/62
+- 背景: WebGPU / WebLLM readiness は表示しているが、WebLLM SDK で実モデルを load し、小さな chat completion を実行する E2E が未完了。
+- スコープ:
+  - WebLLM SDK の model loading boundary を追加する
+  - WebGPU 非対応環境では fallback reason を明示する
+  - WebGPU 対応環境では model load progress と completion smoke test を確認できるようにする
+  - 実行手順を日本語 docs に残す
+- 受け入れ条件:
+  - WebGPU 対応環境で WebLLM model load を開始できる
+  - loading progress / model id / result が診断できる
+  - 小さな prompt への completion が成功する
+  - 非対応環境では recorded fallback と理由が明示される
+- 検証:
+  - WebLLM 実モデルロード E2E 診断を追加する
+  - WebGPU 非対応 CI では skip / fallback が確認できる
+  - WebGPU 対応端末では実 model load を手動確認する
+
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
 - 状態: 完了

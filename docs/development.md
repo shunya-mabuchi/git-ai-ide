@@ -72,3 +72,15 @@ OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-ide/ai-runtime test:olla
 - `OLLAMA_E2E_TIMEOUT_MS`: 既定値は `60000`
 
 この E2E は Ollama `/api/tags` と `/api/generate` を実際に呼び、`mode: ollama` の Patch Proposal 形式を検証します。Ollama 未起動または model 未取得の場合は、先に `ollama serve` と `ollama pull` を実行してください。
+
+## WebLLM 実モデルロード
+
+WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model Routing` から `WebLLM model load 診断` を実行すると、WebGPU 非対応環境では recorded fallback と理由を表示し、対応環境では WebLLM SDK を lazy import して model load と短い chat completion を確認します。
+
+既定の確認 model:
+
+```txt
+Qwen2.5-0.5B-Instruct-q4f16_1-MLC
+```
+
+初回は model download と cache に時間がかかります。WebLLM の公式 docs では `CreateMLCEngine()` で model を読み込み、OpenAI 互換の `chat.completions.create()` で completion を実行します。
