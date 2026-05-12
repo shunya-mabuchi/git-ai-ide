@@ -1986,7 +1986,13 @@ export function App() {
                           </li>
                         ))}
                       </ul>
-                      {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : <span>setup docs: docs/github-app-setup.md</span>}
+                      {githubInstallUrl ? (
+                        <a href={githubInstallUrl} rel="noreferrer" target="_blank">
+                          GitHub App install
+                        </a>
+                      ) : (
+                        <span>setup docs: docs/github-app-setup.md</span>
+                      )}
                     </div>
                     {githubConfigured ? (
                       <label className="repo-select">
@@ -2211,7 +2217,11 @@ export function App() {
                   >
                     {isOpeningWorkspace ? "読み込み中" : "ローカル repo を開く"}
                   </button>
-                  {githubInstallUrl ? <a className="button secondary" href={githubInstallUrl}>GitHub App を接続</a> : null}
+                  {githubInstallUrl ? (
+                    <a className="button secondary" href={githubInstallUrl} rel="noreferrer" target="_blank">
+                      GitHub App を接続
+                    </a>
+                  ) : null}
                 </div>
               </div>
             )}

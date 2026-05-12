@@ -17,6 +17,24 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-047: GitHub App 接続リンクを新タブで開く
+
+- 状態: 完了
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p2`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/97
+- 背景: GitHub App 接続 CTA を押したとき、IDE 画面から離れるのではなく GitHub App install 画面を新タブで開きたい。
+- スコープ:
+  - 空 workspace の `GitHub App を接続` link を新タブで開く
+  - Source Control の `GitHub App install` link も新タブで開く
+  - 外部リンクとして `rel="noreferrer"` を付ける
+- 受け入れ条件:
+  - GitHub App install URL が同一タブではなく新タブで開く
+  - typecheck / build が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps\web\node_modules\.bin\vite.CMD build` 成功
+
 ## GAI-046: 公開前にローカルで可能な runtime / docs / smoke を固める
 
 - 状態: 完了
