@@ -1622,6 +1622,80 @@ button {
   padding: 8px;
 }
 
+.model-router {
+  background: #101419;
+  border: 1px solid #303640;
+  border-radius: 6px;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.model-router-header {
+  display: grid;
+  gap: 3px;
+}
+
+.model-router-header strong {
+  color: #eef3f6;
+  font-size: 12px;
+}
+
+.model-router-header span {
+  color: #9aa6b2;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.model-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.model-card {
+  background: #111419;
+  border: 1px solid #303640;
+  border-radius: 6px;
+  color: #cbd4dc;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  text-align: left;
+}
+
+.model-card.active {
+  border-color: #8bd8a5;
+  box-shadow: inset 2px 0 0 #8bd8a5;
+}
+
+.model-card strong {
+  color: #eef3f6;
+  font-size: 12px;
+}
+
+.model-card span,
+.model-card small,
+.model-card em {
+  color: #9aa6b2;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.model-card-compatible small,
+.model-card-likely_compatible small {
+  color: #8bd8a5;
+}
+
+.model-card-maybe_too_large small,
+.model-card-artifact_unverified small {
+  color: #d7c47a;
+}
+
 .diagnostic-log {
   background: #0c1014;
   border: 1px solid #263039;

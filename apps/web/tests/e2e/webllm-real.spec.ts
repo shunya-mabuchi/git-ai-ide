@@ -16,7 +16,7 @@ test.describe("WebLLM model load E2E", () => {
 
     await page.getByRole("button", { name: /WebLLM model load 診断/ }).click();
 
-    const log = page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-0.5B-Instruct-q4f16_1-MLC" });
+    const log = page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC" });
     await expect(log).toContainText("mode: webllm", { timeout: 180_000 });
     await expect(log).toContainText("completion:");
   });

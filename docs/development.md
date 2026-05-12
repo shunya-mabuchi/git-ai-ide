@@ -6,9 +6,9 @@
 - pnpm 10.33.4
 - Cloudflare Wrangler
 - Chrome または Edge
-- Ollama は optional
+- Ollama は主機能から外した optional / legacy diagnostic
 
-Docker は初期開発では必須にしません。WebGPU、File System Access API、WebContainer、Ollama はホストブラウザやホスト OS との関係が強いためです。
+Docker は初期開発では必須にしません。WebGPU、File System Access API、WebContainer はホストブラウザやホスト OS との関係が強いためです。
 
 ## セットアップ
 
@@ -48,15 +48,15 @@ pnpm test
 pnpm build
 ```
 
-## Ollama fallback の起動
+## Ollama legacy diagnostic
 
-Ollama はホストで起動します。
+Ollama は現時点では主機能ではなく、削除候補の legacy diagnostic として残しています。通常の UI では WebLLM / Recorded AI を使います。
 
 ```bash
 ollama serve
 ```
 
-Git AI IDE は `http://localhost:11434` を fallback runtime として扱います。
+Git AI IDE の通常ルーティングは `http://localhost:11434` を自動推奨しません。
 
 実 runtime E2E は、Ollama 起動済みかつ model pull 済みの環境で実行します。
 
@@ -83,13 +83,15 @@ OLLAMA_E2E_REQUIRED=1 OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-id
 
 ## WebLLM 実モデルロード
 
-WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model Routing` から `WebLLM model load 診断` を実行すると、WebGPU 非対応環境では recorded fallback と理由を表示し、対応環境では WebLLM SDK を lazy import して model load と短い chat completion を確認します。
+WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model Routing` から `WebLLM model load 診断` を実行すると、WebGPU 非対応環境では recorded fallback と理由を表示し、対応環境では npm dependency として bundle した `@mlc-ai/web-llm` で model load と短い chat completion を確認します。CDN dynamic import には依存しません。
 
 既定の確認 model:
 
 ```txt
-Qwen2.5-0.5B-Instruct-q4f16_1-MLC
+Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC
 ```
+
+Model Routing は WebGPU adapter、推定 storage quota、task priority、branch 状態から候補を絞ります。端末に合わない model は通常候補から外し、実 load に失敗した model は次回以降の候補から下げる設計です。
 
 初回は model download と cache に時間がかかります。WebLLM の公式 docs では `CreateMLCEngine()` で model を読み込み、OpenAI 互換の `chat.completions.create()` で completion を実行します。
 

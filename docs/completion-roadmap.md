@@ -27,8 +27,8 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
 - GitHub PR Flow readiness checklist
 - Recorded AI fallback
 - 複数案 Patch Queue / reject / failed reason
-- Ollama Patch Proposal request boundary
-- Ollama E2E diagnostic UI
+- WebLLM model catalog / device-aware routing
+- WebLLM npm dependency 化
 - Cloudflare Worker API boundary
 - D1 schema for workflow metadata
 - 日本語の issue / PR / docs 運用
@@ -39,10 +39,9 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
 
 1. Cloudflare deploy URL での Worker / D1 / GitHub App secrets 結合確認
 2. WebContainer iframe preview E2E
-3. Ollama 実 runtime E2E
-4. WebLLM 実モデルロード E2E
+3. WebLLM 実モデルロード E2E
 
-Local Preview tab、GitHub 実操作モード導線、GitHub App local real E2E は完了済みです。以降は deploy 環境、WebGPU、Ollama model など、外部環境に依存する E2E です。
+Local Preview tab、GitHub 実操作モード導線、GitHub App local real E2E は完了済みです。以降は deploy 環境、WebGPU など、外部環境に依存する E2E です。
 
 ### 1. Cloudflare deploy URL 結合確認
 
@@ -79,34 +78,19 @@ GIT_AI_IDE_WEBCONTAINER_E2E=1 pnpm --filter @git-ai-ide/web test:e2e
 
 通常 CI では WebContainer install / dev server 起動の揺れを避けるため skip し、cross-origin isolation が有効な環境で明示的に実行します。
 
-### 3. Ollama 実 runtime E2E
-
-目的:
-localhost の Ollama から Patch Proposal を生成し、schema validation を通して Patch Queue に入ることを確認する。
-
-現在の確認結果:
-2026-05-12 時点の端末では、Ollama CLI が PATH に存在せず、`127.0.0.1:11434` にも接続できなかったため未確認です。詳細は [Runtime 実機確認ログ](runtime-real-e2e-check.md) に記録しています。
-
-作業:
-
-- `ollama serve`
-- 対応 model を pull
-- Ollama E2E 診断を実行
-- `mode: ollama` と model id が表示されることを確認
-- invalid response 時に fallback できることを確認
-
-### 4. WebLLM 実モデルロード E2E
+### 3. WebLLM 実モデルロード E2E
 
 目的:
 WebGPU 対応ブラウザで、WebLLM runtime が実際に usable になることを確認する。
 
 現在の確認結果:
-2026-05-12 時点の Playwright Chromium では `navigator.gpu` は検出しましたが、`https://esm.run/@mlc-ai/web-llm` の dynamic import に失敗したため未確認です。詳細は [Runtime 実機確認ログ](runtime-real-e2e-check.md) に記録しています。
+2026-05-12 時点の Playwright Chromium では `navigator.gpu` は検出しました。現在は CDN dynamic import をやめ、`@mlc-ai/web-llm` を npm dependency として bundle しています。詳細は [Runtime 実機確認ログ](runtime-real-e2e-check.md) に記録しています。
 
 作業:
 
 - 対応端末で WebGPU を有効化
 - model loading boundary の UX を確認
+- WebGPU adapter / storage quota / task priority に応じて候補が絞られることを確認
 - 小さな patch proposal / summary task を実行
 - 失敗時に Recorded AI fallback が出ることを確認
 

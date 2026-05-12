@@ -101,7 +101,9 @@ export function createLocalPreviewPreflight(
   const browserReady = options.canUseWebContainer ?? canUseWebContainer();
   const items: LocalPreviewPreflightItem[] = [
     {
-      detail: options.forceRecorded ? "Demo workspace は高速な recorded preview を使います。" : "実 repo では WebContainer preview を試します。",
+      detail: options.forceRecorded
+        ? "Demo workspace は高速な recorded preview を使います。"
+        : "実 repo では WebContainer preview を best-effort で試します。native module / private registry / Docker / backend dependency が必要な repo は fallback します。",
       id: "source",
       label: "Workspace source",
       status: options.forceRecorded ? "warning" : "pass",
@@ -140,7 +142,7 @@ export function createLocalPreviewPreflight(
     command: previewCommand,
     items,
     mode: canAttemptWebContainer ? "webcontainer" : "recorded",
-    reason: forced ? items[0].detail : blocked?.detail ?? "WebContainer dev server URL を iframe に接続します。",
+    reason: forced ? items[0].detail : blocked?.detail ?? "WebContainer dev server URL を iframe に best-effort で接続します。",
   };
 }
 
@@ -340,7 +342,7 @@ function runRecordedPreview(plan: RuntimePlan, preflight: LocalPreviewPreflight)
       `build: ${plan.buildCommand ?? "not detected"}`,
       "",
       previewCommand
-        ? "対応環境では WebContainer dev server URL を iframe に接続します。"
+        ? "対応環境では WebContainer dev server URL を iframe に best-effort で接続します。失敗時は理由を表示し、URL bar / recorded preview に fallback します。"
         : "dev / preview script を追加すると Local Preview の候補になります。",
     ].join("\n"),
     mode: "recorded",

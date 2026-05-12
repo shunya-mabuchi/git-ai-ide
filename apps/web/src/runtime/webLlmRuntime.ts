@@ -1,3 +1,5 @@
+import { webLlmModelCatalog } from "./webLlmModelCatalog";
+
 export type WebLlmSmokeResult = {
   log: string;
   mode: "recorded" | "webllm";
@@ -5,15 +7,12 @@ export type WebLlmSmokeResult = {
   ok: boolean;
 };
 
-const defaultWebLlmSourceUrl = "https://esm.run/@mlc-ai/web-llm";
-const defaultWebLlmModelId = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+const defaultWebLlmModelId = "Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC";
 
 export async function runWebLlmSmokeTest(input?: {
   modelId?: string;
-  sourceUrl?: string;
 }): Promise<WebLlmSmokeResult> {
-  const modelId = input?.modelId ?? defaultWebLlmModelId;
-  const sourceUrl = input?.sourceUrl ?? defaultWebLlmSourceUrl;
+  const modelId = resolveSupportedModelId(input?.modelId);
   const hasWebGpu = Boolean((globalThis.navigator as (Navigator & { gpu?: unknown }) | undefined)?.gpu);
 
   if (!hasWebGpu) {
@@ -30,27 +29,9 @@ export async function runWebLlmSmokeTest(input?: {
   }
 
   try {
+    const { CreateMLCEngine } = await import("@mlc-ai/web-llm");
     const progressMessages: string[] = [];
-    const webllm = (await import(/* @vite-ignore */ sourceUrl)) as {
-      CreateMLCEngine: (
-        modelId: string,
-        config: {
-          initProgressCallback?: (progress: { progress?: number; text?: string }) => void;
-        },
-      ) => Promise<{
-        chat: {
-          completions: {
-            create: (request: {
-              max_tokens?: number;
-              messages: Array<{ content: string; role: "system" | "user" }>;
-              temperature?: number;
-            }) => Promise<{ choices?: Array<{ message?: { content?: string } }> }>;
-          };
-        };
-      }>;
-    };
-
-    const engine = await webllm.CreateMLCEngine(modelId, {
+    const engine = await CreateMLCEngine(modelId, {
       initProgressCallback: (progress) => {
         progressMessages.push(`${Math.round((progress.progress ?? 0) * 100)}% ${progress.text ?? "loading"}`);
       },
@@ -92,4 +73,16 @@ export async function runWebLlmSmokeTest(input?: {
       ok: true,
     };
   }
+}
+
+export function getSupportedWebLlmModelIds() {
+  return new Set(webLlmModelCatalog.filter((model) => model.status !== "experimental").map((model) => model.id));
+}
+
+function resolveSupportedModelId(preferredModelId?: string) {
+  const supportedModelIds = getSupportedWebLlmModelIds();
+  if (preferredModelId && supportedModelIds.has(preferredModelId)) return preferredModelId;
+
+  const catalogSupportedModel = webLlmModelCatalog.find((model) => supportedModelIds.has(model.id));
+  return catalogSupportedModel?.id ?? preferredModelId ?? defaultWebLlmModelId;
 }

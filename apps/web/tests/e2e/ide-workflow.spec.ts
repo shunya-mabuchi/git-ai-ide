@@ -91,7 +91,7 @@ test.describe("Git AI IDE workflow", () => {
 
     await page.getByRole("button", { name: /WebLLM model load 診断/ }).click();
 
-    await expect(page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-0.5B-Instruct-q4f16_1-MLC" })).toBeVisible();
+    await expect(page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC" })).toBeVisible();
     await expect(page.locator(".diagnostic-log").filter({ hasText: /mode: (recorded|webllm)/ })).toBeVisible();
   });
 

@@ -54,7 +54,14 @@ import {
 } from "./workspace/localWorkspace";
 import { clearAssistedMemory, createAssistedMemoryProjectKey, loadAssistedMemory, saveAssistedMemory } from "./workspace/assistedMemory";
 import { createLocalPreviewPreflight, runRuntimeChecks, startLocalPreview } from "./runtime/webContainerRuntime";
-import { runWebLlmSmokeTest } from "./runtime/webLlmRuntime";
+import { getSupportedWebLlmModelIds, runWebLlmSmokeTest } from "./runtime/webLlmRuntime";
+import {
+  detectWebLlmDeviceProfile,
+  formatBytes,
+  rankWebLlmModels,
+  type WebLlmDeviceProfile,
+  type WebLlmTask,
+} from "./runtime/webLlmModelCatalog";
 
 type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
@@ -65,7 +72,8 @@ type GitHubSetupState = "checking" | "worker-offline" | "secrets-missing" | "ins
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
-type PatchQueueSource = "demo" | "ai" | "ollama-diagnostic";
+type VisibleAiRuntimeMode = Exclude<AiRuntimeMode, "ollama">;
+type PatchQueueSource = "demo" | "ai";
 
 type PatchQueueItem = {
   failureReason?: string;
@@ -89,7 +97,7 @@ type ExplorerNode = {
 
 type RuntimeDiagnosticItem = {
   detail: string;
-  group: "github" | "webllm" | "ollama" | "webcontainer";
+  group: "github" | "webllm" | "webcontainer";
   id: string;
   label: string;
   status: "pass" | "warning" | "blocked";
@@ -137,6 +145,13 @@ const demoGitHubRepository: GitHubRepositoryOption = {
   fullName: "demo/pr-helper-mini",
   name: "pr-helper-mini",
   owner: "demo",
+};
+
+const defaultWebLlmDeviceProfile: WebLlmDeviceProfile = {
+  adapterDetail: "WebGPU device 診断はまだ実行していません。",
+  crossOriginIsolated: false,
+  tier: "none",
+  webGpuAvailable: false,
 };
 
 export function App() {
@@ -221,8 +236,8 @@ export function App() {
   const [aiRuntimeCheckState, setAiRuntimeCheckState] = useState<"checking" | "ready">("checking");
   const [webLlmDiagnosticState, setWebLlmDiagnosticState] = useState<"idle" | "running">("idle");
   const [webLlmDiagnosticLog, setWebLlmDiagnosticLog] = useState("WebLLM 実モデルロード診断はまだ実行していません。");
-  const [ollamaDiagnosticState, setOllamaDiagnosticState] = useState<"idle" | "running">("idle");
-  const [ollamaDiagnosticLog, setOllamaDiagnosticLog] = useState("Ollama E2E 診断はまだ実行していません。");
+  const [webLlmDeviceProfile, setWebLlmDeviceProfile] = useState<WebLlmDeviceProfile>(defaultWebLlmDeviceProfile);
+  const [selectedWebLlmModelId, setSelectedWebLlmModelId] = useState("Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("balanced");
   const [assistedMemory, setAssistedMemory] = useState(
     "この repo では、AI は structured edit を提案し、ユーザーが diff review 後に適用する。",
@@ -263,7 +278,7 @@ export function App() {
       .then((status) => {
         if (cancelled) return;
         setAiRuntimeStatus(status);
-        setAiRuntimeMode(status.recommendedProvider);
+        setAiRuntimeMode(status.recommendedProvider === "ollama" ? "webllm" : status.recommendedProvider);
         setAiRuntimeCheckState("ready");
       })
       .catch(() => {
@@ -272,6 +287,19 @@ export function App() {
         setAiRuntimeMode("recorded");
         setAiRuntimeCheckState("ready");
       });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    detectWebLlmDeviceProfile().then((profile) => {
+      if (cancelled) return;
+      setWebLlmDeviceProfile(profile);
+    });
 
     return () => {
       cancelled = true;
@@ -631,10 +659,26 @@ export function App() {
     fileCount: fileNames.length,
     priority: taskPriority,
   });
+  const webLlmTask: WebLlmTask = taskPriority === "deep" ? "branch_review" : gitStatus.entries.length > 0 ? "patch" : "pr_draft";
+  const supportedWebLlmModelIds = useMemo(() => getSupportedWebLlmModelIds(), []);
+  const rankedWebLlmModels = useMemo(
+    () =>
+      rankWebLlmModels({
+        device: webLlmDeviceProfile,
+        task: webLlmTask,
+        verifiedModelIds: new Set(),
+      }),
+    [webLlmDeviceProfile, webLlmTask],
+  );
+  const visibleWebLlmModels = rankedWebLlmModels.filter((model) => model.visibility !== "hidden").slice(0, 4);
+  const recommendedWebLlmModel = rankedWebLlmModels.find((model) => model.visibility === "recommended") ?? rankedWebLlmModels[0];
   const selectedRuntimeLabel = runtimeLabels[aiRuntimeMode];
   const selectedRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === aiRuntimeMode);
-  const ollamaRuntimeHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "ollama");
   const selectedRuntimeAvailable = selectedRuntimeHealth?.status === "available";
+  useEffect(() => {
+    if (!recommendedWebLlmModel) return;
+    setSelectedWebLlmModelId((current) => (current ? current : recommendedWebLlmModel.id));
+  }, [recommendedWebLlmModel]);
   const runtimePlan = useMemo(() => planRuntimeFromPackageJson(files), [files]);
   const previewPreflight = useMemo(
     () =>
@@ -675,7 +719,6 @@ export function App() {
   );
   const runtimeDiagnostics = useMemo<RuntimeDiagnosticItem[]>(() => {
     const webllmHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "webllm");
-    const ollamaHealth = aiRuntimeStatus.providers.find((provider) => provider.provider === "ollama");
     const githubModeReady = githubConfigured ? Boolean(selectedInstallationId) : true;
     const webContainerBlocked = previewPreflight.items.find((item) => item.status === "blocked");
     const webContainerWarning = previewPreflight.items.find((item) => item.status === "warning");
@@ -718,30 +761,12 @@ export function App() {
       {
         detail:
           webllmHealth?.status === "available"
-            ? "model loading boundary と cache UX の確認対象です。"
+            ? `${visibleWebLlmModels.length} 件の候補を device / task で推薦しています。`
             : "WebGPU 対応端末で model loading を確認します。",
         group: "webllm",
         id: "webllm-model-load",
-        label: "Model loading / cache",
+        label: "Model catalog / cache",
         status: webllmHealth?.status === "available" ? "warning" : "blocked",
-      },
-      {
-        detail: ollamaHealth?.detail ?? "Ollama runtime をまだ確認していません。",
-        group: "ollama",
-        id: "ollama-models",
-        label: "Ollama models",
-        status: ollamaHealth?.status === "available" ? "pass" : "blocked",
-      },
-      {
-        detail: ollamaDiagnosticLog,
-        group: "ollama",
-        id: "ollama-patch-proposal",
-        label: "Ollama Patch Proposal",
-        status: ollamaDiagnosticLog.includes("mode: ollama")
-          ? "pass"
-          : ollamaDiagnosticLog.includes("mode: recorded")
-            ? "warning"
-            : "blocked",
       },
       {
         detail: previewPreflight.reason,
@@ -763,7 +788,6 @@ export function App() {
     branchPushed,
     createdPrUrl,
     githubConfigured,
-    ollamaDiagnosticLog,
     previewMode,
     previewPreflight.items,
     previewPreflight.reason,
@@ -771,6 +795,7 @@ export function App() {
     pushedCommitSha,
     selectedInstallationId,
     selectedRepository,
+    visibleWebLlmModels.length,
   ]);
   const currentStep = commitCreated ? "Commit draft 作成済み" : testsRun ? "PR 作成待ち" : patchApplied ? "Tests 実行待ち" : "変更中";
   const safetyStatus = testsRun
@@ -865,7 +890,7 @@ export function App() {
         path: selectedFile,
       },
       context: contextPack,
-      modelId: selectedRuntimeHealth?.modelIds[0],
+      modelId: aiRuntimeMode === "webllm" ? selectedWebLlmModelId : selectedRuntimeHealth?.modelIds[0],
       mode: aiRuntimeMode,
     });
 
@@ -893,61 +918,11 @@ export function App() {
     setPatchGenerationState("idle");
   };
 
-  const runOllamaDiagnostic = async () => {
-    setOllamaDiagnosticState("running");
-    setOllamaDiagnosticLog("Ollama E2E 診断を実行中...");
-
-    const modelId = ollamaRuntimeHealth?.modelIds[0];
-    const result = await requestPatchProposal({
-      allowedFiles: [selectedFile],
-      branchGoalMarkdown,
-      currentFile: {
-        content: currentFile,
-        path: selectedFile,
-      },
-      context: contextPack,
-      mode: "ollama",
-      modelId,
-      timeoutMs: 20_000,
-    });
-
-    if (result.ok) {
-      queuePatchProposal(result.proposal, "ollama-diagnostic", result.warnings.length ? result.warnings.join(" / ") : undefined);
-      setPatchApplied(false);
-      setTestsRun(false);
-      setPrDraftGenerated(false);
-      setCommitCreated(false);
-      setBranchPushed(false);
-      setCreatedPrUrl("");
-      setPatchGenerationMessage(`Ollama E2E 診断から patch proposal を受け取りました。mode: ${result.mode}`);
-      setOllamaDiagnosticLog(
-        [
-          `mode: ${result.mode}`,
-          `model: ${modelId ?? "not detected"}`,
-          `proposal: ${result.proposal.title}`,
-          `edits: ${result.proposal.edits.length}`,
-          result.warnings.length ? `warnings: ${result.warnings.join(" / ")}` : "warnings: none",
-        ].join("\n"),
-      );
-    } else {
-      setOllamaDiagnosticLog(
-        [
-          `mode: ${result.mode}`,
-          `model: ${modelId ?? "not detected"}`,
-          `error: ${result.error}`,
-          result.warnings.length ? `warnings: ${result.warnings.join(" / ")}` : "warnings: none",
-        ].join("\n"),
-      );
-    }
-
-    setOllamaDiagnosticState("idle");
-  };
-
   const runWebLlmDiagnostic = async () => {
     setWebLlmDiagnosticState("running");
     setWebLlmDiagnosticLog("WebLLM 実モデルロード診断を実行中...");
 
-    const result = await runWebLlmSmokeTest();
+    const result = await runWebLlmSmokeTest({ modelId: selectedWebLlmModelId });
     setWebLlmDiagnosticLog(result.log);
     setAiRuntimeMode(result.mode);
     setWebLlmDiagnosticState("idle");
@@ -2368,7 +2343,7 @@ export function App() {
               <section className="assistant-section">
                 <PanelTitle title="Model Routing" />
                 <div className="runtime-grid">
-                  {(["recorded", "webllm", "ollama"] as const).map((runtime) => (
+                  {(["webllm", "recorded"] as VisibleAiRuntimeMode[]).map((runtime) => (
                     <button
                       className={runtimeCardClassName(
                         aiRuntimeMode,
@@ -2384,18 +2359,40 @@ export function App() {
                     </button>
                   ))}
                 </div>
+                <div className="model-router">
+                  <div className="model-router-header">
+                    <strong>推奨モデル</strong>
+                    <span>task: {webLlmTask} / 端末: {webLlmDeviceProfile.tier}</span>
+                    <span>{webLlmDeviceProfile.adapterDetail}</span>
+                    <span>storage: {formatBytes(webLlmDeviceProfile.storageQuota)}</span>
+                  </div>
+                  <div className="model-cards">
+                    {visibleWebLlmModels.map((model) => (
+                      <button
+                        className={`model-card ${selectedWebLlmModelId === model.id ? "active" : ""} model-card-${model.compatibility}`}
+                        key={model.id}
+                        onClick={() => {
+                          setSelectedWebLlmModelId(model.id);
+                          setAiRuntimeMode("webllm");
+                        }}
+                      >
+                        <strong>{model.title}</strong>
+                        <span>{model.family} / {model.sizeClass} / {model.license}</span>
+                        <small>{supportedWebLlmModelIds.has(model.id) ? model.compatibility : `${model.compatibility} / 未確認 artifact`}</small>
+                        <em>{model.reason}</em>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="routing-note">
                   <strong>Suggestion: {runtimeLabels[runtimeSuggestion]}</strong>
-                  <span>Selected: {selectedRuntimeLabel}</span>
+                  <span>選択中: {selectedRuntimeLabel}</span>
+                  <span>Model: {selectedWebLlmModelId}</span>
                   <span>{aiRuntimeCheckState === "checking" ? "runtime を確認中" : selectedRuntimeHealth?.detail}</span>
                   <button className="button secondary" disabled={webLlmDiagnosticState === "running"} onClick={runWebLlmDiagnostic}>
                     {webLlmDiagnosticState === "running" ? "WebLLM 診断中" : "WebLLM model load 診断"}
                   </button>
                   <pre className="diagnostic-log">{webLlmDiagnosticLog}</pre>
-                  <button className="button secondary" disabled={ollamaDiagnosticState === "running"} onClick={runOllamaDiagnostic}>
-                    {ollamaDiagnosticState === "running" ? "Ollama 診断中" : "Ollama E2E 診断"}
-                  </button>
-                  <pre className="diagnostic-log">{ollamaDiagnosticLog}</pre>
                 </div>
               </section>
 
@@ -2414,7 +2411,7 @@ export function App() {
               <section className="assistant-section">
                 <PanelTitle title="E2E Diagnostics" />
                 <div className="diagnostic-grid">
-                  {(["github", "webllm", "ollama", "webcontainer"] as const).map((group) => (
+                  {(["github", "webllm", "webcontainer"] as const).map((group) => (
                     <div className="diagnostic-group" key={group}>
                       <strong>{diagnosticGroupLabels[group]}</strong>
                       <ul className="diagnostic-list">
@@ -2979,14 +2976,7 @@ function suggestRuntimeMode(input: {
   const providerAvailable = (provider: AiRuntimeMode) =>
     input.aiRuntimeStatus.providers.some((runtimeProvider) => runtimeProvider.provider === provider && runtimeProvider.status === "available");
 
-  if (
-    providerAvailable("ollama") &&
-    (input.priority === "deep" || input.budgetRatio > 0.85 || input.changeCount > 8 || input.fileCount > 80)
-  ) {
-    return "ollama";
-  }
-
-  if (providerAvailable("webllm") && input.priority === "fast" && input.changeCount <= 1 && input.budgetRatio < 0.55) {
+  if (providerAvailable("webllm") && input.fileCount < 120 && input.budgetRatio < 0.9) {
     return "webllm";
   }
 
@@ -3147,7 +3137,6 @@ const runtimeDescriptions: Record<AiRuntimeMode, string> = {
 
 const diagnosticGroupLabels: Record<RuntimeDiagnosticItem["group"], string> = {
   github: "GitHub App",
-  ollama: "Ollama",
   webcontainer: "WebContainer",
   webllm: "WebLLM",
 };
