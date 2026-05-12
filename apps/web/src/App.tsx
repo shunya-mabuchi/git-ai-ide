@@ -134,6 +134,10 @@ const demoGitHubRepository: GitHubRepositoryOption = {
 
 export function App() {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const forceWebContainerPreview = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("preview") === "webcontainer";
+  }, []);
   const [selectedFile, setSelectedFile] = useState<FileName>("src/features/pr-summary/generateSummary.ts");
   const [openFiles, setOpenFiles] = useState<FileName[]>(["src/features/pr-summary/generateSummary.ts"]);
   const [editorTarget, setEditorTarget] = useState<{ file: FileName; line: number } | null>(null);
@@ -607,9 +611,9 @@ export function App() {
   const previewPreflight = useMemo(
     () =>
       createLocalPreviewPreflight(runtimePlan, {
-        forceRecorded: workspaceSource === "demo",
+        forceRecorded: workspaceSource === "demo" && !forceWebContainerPreview,
       }),
-    [runtimePlan, workspaceSource],
+    [forceWebContainerPreview, runtimePlan, workspaceSource],
   );
   const safetyGate = useMemo(
     () =>
@@ -1255,7 +1259,7 @@ export function App() {
     setPreviewLog("Git AI IDE Local Preview\npreview を起動中...");
 
     const result = await startLocalPreview(files, runtimePlan, {
-      forceRecorded: workspaceSource === "demo",
+      forceRecorded: workspaceSource === "demo" && !forceWebContainerPreview,
     });
     setPreviewLog(result.log);
     setPreviewMode(result.mode);

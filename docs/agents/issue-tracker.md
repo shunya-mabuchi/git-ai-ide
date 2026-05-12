@@ -721,7 +721,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-033: WebContainer iframe preview E2E を完了する
 
-- 状態: 進行中
+- 状態: 実装中
 - ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/58
@@ -740,6 +740,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - unit test で preflight と iframe readiness を確認する
   - Playwright E2E で preview tab / iframe readiness 表示を確認する
   - deploy 環境で実 WebContainer preview を手動確認する
+  - `GIT_AI_IDE_WEBCONTAINER_E2E=1 pnpm --filter @git-ai-ide/web test:e2e` で実 WebContainer iframe harness を実行できる
 
 ## GAI-034: Ollama 実 runtime E2E を完了する
 
