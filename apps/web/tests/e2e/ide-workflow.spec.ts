@@ -77,8 +77,8 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-panel")).toBeVisible();
     await expect(page.locator(".editor-surface")).toContainText("Local Preview");
-    await expect(page.locator(".editor-surface .preview-preflight-pass", { hasText: "Browser isolation" })).toBeVisible();
-    await expect(page.locator(".editor-surface")).toContainText("cross-origin isolation と SharedArrayBuffer が有効です。");
+    await expect(page.locator(".editor-surface .preview-iframe")).toBeVisible();
+    await expect(page.locator(".editor-surface .preview-details")).toBeVisible();
 
     await page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts" }).click();
 
