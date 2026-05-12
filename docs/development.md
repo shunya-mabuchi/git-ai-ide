@@ -92,3 +92,12 @@ Qwen2.5-0.5B-Instruct-q4f16_1-MLC
 ```
 
 初回は model download と cache に時間がかかります。WebLLM の公式 docs では `CreateMLCEngine()` で model を読み込み、OpenAI 互換の `chat.completions.create()` で completion を実行します。
+
+通常 CI では WebGPU がないため fallback 診断だけを確認します。
+実 model load を必須にする場合は、WebGPU 対応ブラウザで次を実行します。
+
+```bash
+GIT_AI_IDE_WEBLLM_E2E=1 pnpm --filter @git-ai-ide/web test:e2e
+```
+
+この harness は `mode: webllm`、model id、completion を確認します。

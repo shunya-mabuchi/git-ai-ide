@@ -767,7 +767,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-035: WebLLM 実モデルロード E2E を完了する
 
-- 状態: 進行中
+- 状態: 実装中
 - ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/62
@@ -786,6 +786,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - WebLLM 実モデルロード E2E 診断を追加する
   - WebGPU 非対応 CI では skip / fallback が確認できる
   - WebGPU 対応端末では実 model load を手動確認する
+  - `GIT_AI_IDE_WEBLLM_E2E=1 pnpm --filter @git-ai-ide/web test:e2e` で実 model load harness を実行できる
 
 ## GAI-036: GitHub branch / commit 実操作 UI を追加する
 
