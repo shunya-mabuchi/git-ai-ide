@@ -53,6 +53,7 @@ type SidePanelMode = "explorer" | "search" | "git";
 type BottomPanelMode = "problems" | "terminal" | "preview" | "output";
 type DiffMode = "patch" | "file";
 type EditorView = "file" | "preview";
+type GitHubSetupState = "checking" | "worker-offline" | "secrets-missing" | "installation-missing" | "repository-missing" | "ready";
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
@@ -179,6 +180,7 @@ export function App() {
   const [githubInstallUrl, setGithubInstallUrl] = useState("");
   const [githubInstallations, setGithubInstallations] = useState<GitHubInstallationOption[]>([]);
   const [githubRepositories, setGithubRepositories] = useState<GitHubRepositoryOption[]>([]);
+  const [githubSetupState, setGithubSetupState] = useState<GitHubSetupState>("checking");
   const [selectedRepository, setSelectedRepository] = useState("demo/pr-helper-mini");
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
@@ -258,6 +260,7 @@ export function App() {
           const repositories = await loadGitHubRepositories();
           if (cancelled) return;
           applyGitHubRepositories(repositories);
+          setGithubSetupState("secrets-missing");
           setGithubStatusMessage("Demo mode: GitHub secrets 未設定");
           return;
         }
@@ -270,6 +273,7 @@ export function App() {
         if (!firstInstallation) {
           setGithubRepositories([]);
           setSelectedInstallationId(undefined);
+          setGithubSetupState("installation-missing");
           setGithubStatusMessage("GitHub App configured / installation 未検出");
           return;
         }
@@ -281,12 +285,14 @@ export function App() {
         setIsLoadingGitHubRepositories(false);
         setGithubRepositories(repositories);
         applyGitHubRepositories(repositories);
+        setGithubSetupState(repositories.length > 0 ? "ready" : "repository-missing");
         setGithubStatusMessage(`GitHub App configured / ${firstInstallation.accountLogin}`);
       })
       .catch(() => {
         if (cancelled) return;
         applyGitHubRepositories([demoGitHubRepository]);
         setIsLoadingGitHubRepositories(false);
+        setGithubSetupState("worker-offline");
         setGithubStatusMessage("Worker 未起動: demo mode fallback");
       });
 
@@ -367,12 +373,57 @@ export function App() {
     [baselineFiles, branchName, files],
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
-  const realGitHubMode = githubConfigured && Boolean(selectedInstallationId);
+  const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
+  const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
   const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "Demo Source Control";
   const sourceControlModeDetail = realGitHubMode
     ? "選択した GitHub repository に branch push / PR 作成を行います。"
     : "これはブラウザ内 snapshot と demo repository の simulation です。実 GitHub repo は変更されません。";
   const githubOperationLabel = realGitHubMode ? "Real GitHub operation" : "Demo simulation";
+  const githubSetupChecklist = useMemo(
+    () => [
+      {
+        detail:
+          githubSetupState === "worker-offline"
+            ? "Cloudflare Worker に接続できないため demo fallback で表示しています。"
+            : githubSetupState === "checking"
+              ? "GitHub Worker の setup state を確認中です。"
+              : "GitHub Worker に接続できています。",
+        id: "worker",
+        label: "Worker connection",
+        status: githubSetupState === "worker-offline" ? "blocked" : githubSetupState === "checking" ? "warning" : "pass",
+      },
+      {
+        detail: githubConfigured
+          ? "GitHub App secrets は Worker 側で設定済みです。"
+          : "GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY / GITHUB_APP_SLUG を Worker secret に設定すると実操作に進めます。",
+        id: "secrets",
+        label: "GitHub App credentials",
+        status: githubConfigured ? "pass" : "blocked",
+      },
+      {
+        detail: selectedInstallationId
+          ? "GitHub App installation を選択済みです。"
+          : githubConfigured
+            ? "GitHub App を対象 repository に install してください。"
+            : "credentials 設定後に installation を選択できます。",
+        id: "installation",
+        label: "Installation",
+        status: selectedInstallationId ? "pass" : githubConfigured ? "blocked" : "warning",
+      },
+      {
+        detail: realGitHubMode
+          ? `${selectedRepository} を実操作対象として選択中です。`
+          : githubConfigured && selectedInstallationId
+            ? "selected repository を読み込めていません。installation の権限を確認してください。"
+            : "demo/pr-helper-mini を simulation として表示しています。",
+        id: "repository",
+        label: "Selected repository",
+        status: realGitHubMode ? "pass" : githubConfigured && selectedInstallationId ? "blocked" : "warning",
+      },
+    ],
+    [githubConfigured, githubSetupState, realGitHubMode, selectedInstallationId, selectedRepository],
+  );
   const branchSummaries = useMemo<BranchSummary[]>(
     () => [
       {
@@ -966,9 +1017,11 @@ export function App() {
       applyGitHubRepositories(repositories);
       const installation = githubInstallations.find((item) => item.id === installationId);
       setSelectedInstallationId(installationId);
+      setGithubSetupState(repositories.length > 0 ? "ready" : "repository-missing");
       setGithubStatusMessage(`GitHub App configured / ${installation?.accountLogin ?? installationId}`);
     } catch (error) {
       setGithubRepositories([]);
+      setGithubSetupState("repository-missing");
       setGithubStatusMessage(error instanceof Error ? error.message : "GitHub repositories を取得できませんでした。");
     } finally {
       setIsLoadingGitHubRepositories(false);
@@ -1582,6 +1635,21 @@ export function App() {
                         <span>Repository / branch / history は demo 用の表示です。GitHub App credentials と Worker が有効になると selected repo への実操作に切り替わります。</span>
                       </div>
                     ) : null}
+                    <div className="setup-checklist">
+                      <strong>実操作モード setup</strong>
+                      <ul className="github-readiness">
+                        {githubSetupChecklist.map((item) => (
+                          <li className={`github-readiness-${item.status}`} key={item.id}>
+                            {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                            <span>
+                              <strong>{item.label}</strong>
+                              {item.detail}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : <span>setup docs: docs/github-app-setup.md</span>}
+                    </div>
                     {githubConfigured ? (
                       <label className="repo-select">
                         <span>Installation</span>
@@ -1621,7 +1689,6 @@ export function App() {
                     <span>{realGitHubMode ? "GitHub App configured / selected repo mode" : "Demo mode / no GitHub write operation"}</span>
                     {isLoadingGitHubRepositories ? <span>Repository を読み込み中</span> : null}
                     <span>{githubStatusMessage}</span>
-                    {githubInstallUrl ? <a href={githubInstallUrl}>GitHub App install</a> : null}
                     <span>{branchPushed ? (realGitHubMode ? "branch pushed" : "demo branch push simulated") : realGitHubMode ? "push pending" : "demo push pending"}</span>
                     {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}

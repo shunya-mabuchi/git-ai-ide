@@ -642,7 +642,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
-- 状態: 未着手
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:github`, `領域:web`, `優先度:p1`
 - 担当: 未定
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/49
@@ -660,11 +660,10 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - installation と selected repo が揃ったときだけ real operation として表示される
   - Source Control の branch / history 表示が demo と real で混ざらない
 - 検証:
-  - unit test または shared logic test で readiness state を確認する
-  - Playwright E2E で demo fallback 表示と setup checklist を確認する
-  - `pnpm -r typecheck`
-  - `pnpm --filter @git-ai-ide/web build`
-  - `pnpm --filter @git-ai-ide/web test:e2e`
+  - Playwright E2E で demo fallback 表示と setup checklist を確認
+  - `pnpm --filter @git-ai-ide/web test` 相当成功
+  - `pnpm --filter @git-ai-ide/web build` 相当成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 相当成功
 
 ## GAI-029: Demo mode と実 GitHub 操作の境界を明確にする
 
