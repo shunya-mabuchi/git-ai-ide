@@ -2,7 +2,7 @@ export type WorkspaceSnapshot = {
   files: Record<string, string>;
   name: string;
   openedAt: string;
-  source: "demo" | "empty" | "local-directory" | "indexeddb";
+  source: "demo" | "empty" | "github" | "indexeddb" | "local-directory";
 };
 
 type LocalFileSystemFileHandle = {
@@ -23,13 +23,29 @@ type WindowWithDirectoryPicker = Window & {
   showDirectoryPicker?: () => Promise<LocalFileSystemDirectoryHandle>;
 };
 
+type IgnoreRule = {
+  directoryOnly: boolean;
+  pattern: string;
+};
+
 const DB_NAME = "git-ai-ide-workspaces";
 const STORE_NAME = "snapshots";
 const SNAPSHOT_KEY = "last-opened";
 const MAX_FILES = 160;
 const MAX_FILE_BYTES = 320_000;
+const MAX_TOTAL_BYTES = 2_000_000;
 
-const ignoredDirectories = new Set([".git", "node_modules", "dist", "build", ".next", ".turbo", ".wrangler"]);
+const ignoredDirectories = new Set([
+  ".git",
+  ".next",
+  ".turbo",
+  ".wrangler",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+]);
+
 const readableExtensions = new Set([
   ".css",
   ".html",
@@ -46,6 +62,8 @@ const readableExtensions = new Set([
   ".yaml",
 ]);
 
+const ignoredBinaryExtensions = /\.(avif|bmp|gif|ico|jpe?g|mov|mp3|mp4|otf|pdf|png|tgz|ttf|wasm|webm|webp|woff2?|zip)$/i;
+
 export function supportsLocalDirectoryAccess() {
   return typeof (window as WindowWithDirectoryPicker).showDirectoryPicker === "function";
 }
@@ -54,15 +72,16 @@ export async function openLocalDirectorySnapshot(): Promise<WorkspaceSnapshot> {
   const picker = (window as WindowWithDirectoryPicker).showDirectoryPicker;
 
   if (!picker) {
-    throw new Error("このブラウザでは File System Access API が使えません。");
+    throw new Error("このブラウザでは File System Access API を使えません。");
   }
 
   const root = await picker();
   const files: Record<string, string> = {};
-  await readDirectory(root, "", files);
+  const ignoreRules = await loadGitIgnoreRules(root);
+  await readDirectory(root, "", files, ignoreRules, { totalBytes: 0 });
 
   if (Object.keys(files).length === 0) {
-    throw new Error("読み込めるテキストファイルが見つかりませんでした。");
+    throw new Error("読み込める text file が見つかりませんでした。.gitignore、file size、binary file の除外条件を確認してください。");
   }
 
   return {
@@ -100,29 +119,90 @@ async function readDirectory(
   directory: LocalFileSystemDirectoryHandle,
   prefix: string,
   files: Record<string, string>,
+  ignoreRules: IgnoreRule[],
+  budget: { totalBytes: number },
 ) {
   for await (const [name, handle] of directory.entries()) {
     if (Object.keys(files).length >= MAX_FILES) return;
+    if (budget.totalBytes >= MAX_TOTAL_BYTES) return;
+
+    const relativePath = `${prefix}${name}`;
 
     if (handle.kind === "directory") {
-      if (ignoredDirectories.has(name)) continue;
-      await readDirectory(handle, `${prefix}${name}/`, files);
+      if (shouldIgnorePath(`${relativePath}/`, true, ignoreRules)) continue;
+      await readDirectory(handle, `${relativePath}/`, files, ignoreRules, budget);
       continue;
     }
 
+    if (shouldIgnorePath(relativePath, false, ignoreRules)) continue;
     if (!isReadableFile(name)) continue;
 
     const file = await handle.getFile();
     if (file.size > MAX_FILE_BYTES) continue;
+    if (budget.totalBytes + file.size > MAX_TOTAL_BYTES) continue;
 
-    files[`${prefix}${name}`] = await file.text();
+    files[relativePath] = await file.text();
+    budget.totalBytes += file.size;
   }
 }
 
 function isReadableFile(name: string) {
   const lowerName = name.toLowerCase();
+  if (ignoredBinaryExtensions.test(lowerName)) return false;
   if (lowerName === "package.json" || lowerName === "readme.md") return true;
   return [...readableExtensions].some((extension) => lowerName.endsWith(extension));
+}
+
+async function loadGitIgnoreRules(root: LocalFileSystemDirectoryHandle) {
+  const rules: IgnoreRule[] = [];
+
+  for await (const [name, handle] of root.entries()) {
+    if (handle.kind !== "file" || name !== ".gitignore") continue;
+    const text = await (await handle.getFile()).text();
+    rules.push(...parseGitIgnore(text));
+    break;
+  }
+
+  return rules;
+}
+
+export function parseGitIgnore(text: string): IgnoreRule[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("!"))
+    .map((line) => ({
+      directoryOnly: line.endsWith("/"),
+      pattern: line.replace(/^\//, "").replace(/\/$/, ""),
+    }))
+    .filter((rule) => rule.pattern.length > 0);
+}
+
+export function shouldIgnorePath(path: string, isDirectory: boolean, rules: IgnoreRule[]) {
+  const normalizedPath = path.replace(/\\/g, "/").replace(/\/$/, "");
+  const basename = normalizedPath.split("/").at(-1) ?? normalizedPath;
+
+  if (isDirectory && ignoredDirectories.has(basename)) return true;
+  if ([...ignoredDirectories].some((directory) => normalizedPath === directory || normalizedPath.startsWith(`${directory}/`) || normalizedPath.includes(`/${directory}/`))) {
+    return true;
+  }
+  if (!isDirectory && ignoredBinaryExtensions.test(basename)) return true;
+
+  return rules.some((rule) => {
+    if (rule.directoryOnly && !isDirectory && !normalizedPath.includes(`${rule.pattern}/`)) return false;
+    if (rule.pattern.includes("*")) return globLikeMatch(normalizedPath, basename, rule.pattern);
+    if (rule.pattern.includes("/")) return normalizedPath === rule.pattern || normalizedPath.startsWith(`${rule.pattern}/`);
+    return basename === rule.pattern || normalizedPath.startsWith(`${rule.pattern}/`) || normalizedPath.includes(`/${rule.pattern}/`);
+  });
+}
+
+function globLikeMatch(path: string, basename: string, pattern: string) {
+  const escaped = pattern
+    .split("*")
+    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  const regex = new RegExp(`^${escaped}$`);
+  return regex.test(basename) || regex.test(path);
 }
 
 function openDb() {
