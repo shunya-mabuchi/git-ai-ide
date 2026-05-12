@@ -887,6 +887,7 @@ button {
   text-transform: uppercase;
 }
 
+.repo-select input,
 .repo-select select {
   background: #171a1f;
   border: 1px solid #303640;

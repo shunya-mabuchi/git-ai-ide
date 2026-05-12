@@ -40,6 +40,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
 
+## GAI-038: GitHub PR の issue close linkage と実 E2E harness を追加する
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/72
+- 背景: GitHub App 実 credentials の完全 E2E は秘密鍵と selected repo install が必要だが、UI 側には PR body へ close keyword を入れる導線と、credentials がある環境だけで走る E2E harness が必要。
+- スコープ:
+  - GitHub Integration に close issue number の入力を追加する
+  - PR 作成 body に `Closes #<issue>` を明示的に入れる
+  - credentials が揃った環境でだけ実行する real GitHub E2E test を追加する
+  - docs に real E2E の安全な実行手順を追記する
+- 受け入れ条件:
+  - UI から対象 issue number を設定できる
+  - PR 作成時の body に close keyword が入る
+  - 通常 CI では secrets なしで skip / demo tests が通る
+  - 実 credentials 環境では selected repo / branch / PR flow を検証できる
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck`
+  - `pnpm --filter @git-ai-ide/web test`
+  - `pnpm --filter @git-ai-ide/web build`
+  - `pnpm --filter @git-ai-ide/web test:e2e`
+
 ## GAI-001: 正式リポジトリ配置と Agent workflow を整備する
 
 - 状態: 完了

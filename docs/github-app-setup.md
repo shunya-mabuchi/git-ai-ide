@@ -98,6 +98,14 @@ pnpm --filter @git-ai-ide/worker test:github-real
 
 この command は、書き込みをしない read-only smoke test として `/api/github/setup`、`/api/github/installations`、`/api/github/repos` を確認します。
 
+Web UI 側の Playwright harness も secret なしの通常 CI では skip されます。実 credentials を設定した環境だけ、次のように有効化します。
+
+```bash
+GIT_AI_IDE_REAL_GITHUB_E2E=1 VITE_GIT_AI_IDE_WORKER_URL=http://127.0.0.1:8787 pnpm --filter @git-ai-ide/web test:e2e
+```
+
+この harness は Web app と同じ Worker URL に対して setup / installations / repositories を確認し、selected repository mode へ入れる前提を自動検証します。
+
 branch push と PR 作成まで確認する場合だけ、明示的に書き込みを有効にします。
 
 ```bash

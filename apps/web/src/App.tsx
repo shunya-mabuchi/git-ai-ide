@@ -188,6 +188,7 @@ export function App() {
   const [branchPushed, setBranchPushed] = useState(false);
   const [createdPrUrl, setCreatedPrUrl] = useState("");
   const [pushedCommitSha, setPushedCommitSha] = useState("");
+  const [closeIssueNumber, setCloseIssueNumber] = useState("");
   const [githubConfigured, setGithubConfigured] = useState(false);
   const [githubInstallUrl, setGithubInstallUrl] = useState("");
   const [githubInstallations, setGithubInstallations] = useState<GitHubInstallationOption[]>([]);
@@ -756,6 +757,7 @@ export function App() {
         branchGoalMarkdown,
         branchName,
         changedFiles: gitStatus.entries,
+        closeIssueNumber: normalizeIssueNumber(closeIssueNumber),
         previewChecked: previewRunState === "ready",
         runtimeLabel: selectedRuntimeLabel,
         safetyReady: safetyGate.canCreatePullRequest,
@@ -767,6 +769,7 @@ export function App() {
       assistedMemory,
       branchGoalMarkdown,
       branchName,
+      closeIssueNumber,
       gitStatus.entries,
       previewRunState,
       runtimePlan.warnings,
@@ -1467,9 +1470,10 @@ export function App() {
     setIsCreatingPr(true);
 
     try {
+      const pullRequestBody = ensureCloseKeyword(prDraftMarkdown || currentPrDraftMarkdown, closeIssueNumber);
       const result = await createGitHubPullRequest({
         baseBranch: "main",
-        body: prDraftMarkdown || currentPrDraftMarkdown,
+        body: pullRequestBody,
         branch: branchName,
         installationId: selectedInstallationId,
         repository: selectedRepository,
@@ -1922,6 +1926,15 @@ export function App() {
                           </option>
                         ))}
                       </select>
+                    </label>
+                    <label className="repo-select">
+                      <span>Close issue</span>
+                      <input
+                        inputMode="numeric"
+                        placeholder="例: 72"
+                        value={closeIssueNumber}
+                        onChange={(event) => setCloseIssueNumber(event.target.value)}
+                      />
                     </label>
                     <span>{realGitHubMode ? "GitHub App configured / selected repo mode" : "Demo mode / no GitHub write operation"}</span>
                     {isLoadingGitHubRepositories ? <span>Repository を読み込み中</span> : null}
@@ -2890,11 +2903,23 @@ function formatTokenCount(value: number) {
   return String(value);
 }
 
+function normalizeIssueNumber(value: string) {
+  return value.replace(/^#/, "").replace(/[^\d]/g, "");
+}
+
+function ensureCloseKeyword(markdown: string, issueNumber: string) {
+  const normalizedIssueNumber = normalizeIssueNumber(issueNumber);
+  if (!normalizedIssueNumber) return markdown;
+  if (new RegExp(`\\b(closes|fixes|resolves)\\s+#${normalizedIssueNumber}\\b`, "i").test(markdown)) return markdown;
+  return `${markdown.trim()}\n\n## 関連 Issue\nCloses #${normalizedIssueNumber}\n`;
+}
+
 function createPrDraftMarkdown(input: {
   assistedMemory: string;
   branchGoalMarkdown: string;
   branchName: string;
   changedFiles: Array<{ file: string; status: string }>;
+  closeIssueNumber: string;
   previewChecked: boolean;
   runtimeLabel: string;
   safetyReady: boolean;
@@ -2909,6 +2934,7 @@ function createPrDraftMarkdown(input: {
   const memoryLines = toMarkdownBullets(input.assistedMemory, "- Project-specific memory は未設定。");
   const goalSummary = extractSectionPreview(input.branchGoalMarkdown, "Goal") || input.title;
   const acceptanceSummary = extractSectionPreview(input.branchGoalMarkdown, "Acceptance Criteria") || "Branch Goal の受け入れ条件に沿って確認する。";
+  const closeIssueLine = input.closeIssueNumber ? `\n## 関連 Issue\nCloses #${input.closeIssueNumber}\n` : "";
   const warnings =
     input.warnings.length > 0 ? input.warnings.map((warning) => `- ${warning}`).join("\n") : "- runtime warning なし。";
 
@@ -2927,6 +2953,7 @@ ${toMarkdownBullets(acceptanceSummary, "- Branch Goal を確認する。")}
 
 ## Assisted Memory
 ${memoryLines}
+${closeIssueLine}
 
 ## リスクと確認観点
 ${warnings}
