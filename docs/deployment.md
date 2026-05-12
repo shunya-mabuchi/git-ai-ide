@@ -71,6 +71,8 @@ Worker URL を Pages の環境変数に設定します。
 VITE_GIT_AI_IDE_WORKER_URL=https://<worker-name>.<account>.workers.dev
 ```
 
+`apps/web/public/_headers` で `Cross-Origin-Opener-Policy: same-origin` と `Cross-Origin-Embedder-Policy: require-corp` を配信します。これは WebContainer iframe preview に必要な cross-origin isolation を有効にするためです。
+
 ## 4. GitHub App を設定する
 
 GitHub App は selected repository のみを対象にします。
@@ -98,9 +100,11 @@ Callback / install まわりの詳細は [GitHub App セットアップ](github-
 2. Demo repo が表示される
 3. Patch Queue と Diff Preview が動く
 4. Local Preview panel に preflight が表示される
-5. GitHub Integration が demo mode または GitHub App mode を表示する
-6. Worker `/health` が `ok: true` を返す
-7. GitHub App mode の場合、installation と repository が選択できる
+5. Browser isolation が pass になり、`cross-origin isolation と SharedArrayBuffer が有効です。` と表示される
+6. WebContainer 対応 repo で Local Preview を実行し、Preview tab 内に dev server iframe が表示される
+7. GitHub Integration が demo mode または GitHub App mode を表示する
+8. Worker `/health` が `ok: true` を返す
+9. GitHub App mode の場合、installation と repository が選択できる
 
 ## 既知の制約
 
