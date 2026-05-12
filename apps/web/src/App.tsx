@@ -2177,10 +2177,6 @@ function PanelTitle({ title }: { title: string }) {
 
 function LocalPreviewPanel({
   previewAvailable,
-  previewCommand,
-  previewLog,
-  previewMode,
-  previewPreflight,
   previewRunState,
   previewUrl,
   workspaceName,
@@ -2194,25 +2190,10 @@ function LocalPreviewPanel({
   previewUrl: string;
   workspaceName: string;
 }) {
-  const resolvedPreviewMode =
-    previewMode === "webcontainer"
-      ? "WebContainer iframe"
-      : previewMode === "recorded"
-        ? "Recorded fallback"
-        : previewPreflight.canAttemptWebContainer
-          ? "WebContainer candidate"
-          : "Recorded fallback";
   const recordedPreviewHtml = createRecordedPreviewHtml(workspaceName, previewRunState);
 
   return (
     <div className="preview-panel">
-      <div className="preview-statusbar">
-        <div>
-          <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
-          <span>{previewUrl ? previewUrl : previewAvailable ? `${previewCommand} / ${resolvedPreviewMode}` : "dev または preview script がありません。"}</span>
-        </div>
-        <span className={`preview-badge preview-badge-${previewRunState}`}>{previewRunState === "ready" ? "Ready" : previewRunState === "running" ? "Starting" : "Idle"}</span>
-      </div>
       {previewUrl ? (
         <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
       ) : previewAvailable ? (
@@ -2224,24 +2205,6 @@ function LocalPreviewPanel({
           <p>この repo では自動 preview の候補がありません。</p>
         </div>
       )}
-      <details className="preview-details">
-        <summary>Preview diagnostics</summary>
-        <div className="preview-info">
-          <span>{previewPreflight.reason}</span>
-          <ul className="preview-preflight">
-            {previewPreflight.items.map((item) => (
-              <li className={`preview-preflight-${item.status}`} key={item.id}>
-                {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "warning" ? <TriangleAlert size={14} /> : <Circle size={14} />}
-                <span>
-                  <strong>{item.label}</strong>
-                  {item.detail}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <pre className="preview-log">{previewLog}</pre>
-        </div>
-      </details>
     </div>
   );
 }
