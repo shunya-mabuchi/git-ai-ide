@@ -76,7 +76,7 @@ Web app から `http://127.0.0.1:8787/api/github/setup` を読めると、GitHub
 - `POST /api/github/push-files`
 - `POST /api/github/prs`
 
-secret 未設定時は demo mode を返します。これにより、GitHub App install なしでも Branch to PR flow を確認できます。
+secret 未設定時は setup required を返します。GitHub App install と Worker secrets が揃うまで、push / PR 作成は実行しません。
 
 ## 実 credentials E2E の確認手順
 
@@ -103,7 +103,7 @@ pnpm --filter @git-ai-ide/worker exec wrangler d1 migrations apply git-ai-ide --
 - `/api/github/setup` が `appConfigured: true` を返す
 - `/api/github/installations` が installation を返す
 - `/api/github/repos?installation_id=...` が selected repository を返す
-- GitHub Integration が `Demo mode / no GitHub write operation` ではなく `GitHub App configured / selected repo mode` を表示する
+- GitHub Integration が `GitHub setup required` ではなく `GitHub App configured / selected repo mode` を表示する
 
 同じ確認を script で実行できます。
 

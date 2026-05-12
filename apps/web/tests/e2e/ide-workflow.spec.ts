@@ -1,8 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Git AI IDE workflow", () => {
-  test("Explorer でファイル操作を行い Git panel で差分と branch context を確認できる", async ({ page }) => {
+  test("通常起動では repo 接続導線を表示する", async ({ page }) => {
     await page.goto("/");
+
+    await expect(page.getByText("Repository を開いてください")).toBeVisible();
+    await expect(page.getByText("Demo Source Control")).toHaveCount(0);
+    await expect(page.getByText("Demo repository")).toHaveCount(0);
+  });
+
+  test("Explorer でファイル操作を行い Git panel で差分と branch context を確認できる", async ({ page }) => {
+    await page.goto("/?fixture=demo");
 
     if (!(await page.getByText("New file").isVisible())) {
       await page.getByLabel("Explorer").click();
@@ -22,8 +30,8 @@ test.describe("Git AI IDE workflow", () => {
 
     await page.getByLabel("Git").click();
     const githubBox = page.locator(".github-box");
-    await expect(page.getByText("Demo Source Control")).toBeVisible();
-    await expect(page.getByText("実 GitHub repository には接続していません")).toBeVisible();
+    await expect(page.getByText(/GitHub Source Control|GitHub connection required/)).toBeVisible();
+    await expect(page.getByText("Demo Source Control")).toHaveCount(0);
     await expect(githubBox.getByText("実操作モード setup")).toBeVisible();
     const setupItems = githubBox.locator(".setup-checklist li strong");
     await expect(setupItems.filter({ hasText: "Worker connection" })).toBeVisible();
@@ -38,12 +46,12 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByRole("button", { name: /e2e-note\.md added/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /e2e-folder\/\.gitkeep added/ })).toBeVisible();
 
-    await page.getByRole("button", { name: "競合デモ" }).click();
+    await page.getByRole("button", { name: "fixture 競合" }).click();
     await expect(page.getByText("Conflict handling")).toBeVisible();
   });
 
   test("編集 dirty と保存状態は Git diff と分離して扱える", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     await page.locator(".monaco-editor").click();
     await page.keyboard.press("ControlOrMeta+A");
@@ -62,7 +70,7 @@ test.describe("Git AI IDE workflow", () => {
   });
 
   test("rename と delete 後に tab / selected file / Git diff が同期する", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     if (!(await page.getByText("New file").isVisible())) {
       await page.getByLabel("Explorer").click();
@@ -83,7 +91,7 @@ test.describe("Git AI IDE workflow", () => {
   });
 
   test("WebLLM model load 診断は WebGPU 非対応環境で fallback reason を表示する", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     if (!(await page.getByRole("button", { name: /WebLLM model load 診断/ }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();
@@ -92,11 +100,11 @@ test.describe("Git AI IDE workflow", () => {
     await page.getByRole("button", { name: /WebLLM model load 診断/ }).click();
 
     await expect(page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC" })).toBeVisible();
-    await expect(page.locator(".diagnostic-log").filter({ hasText: /mode: (recorded|webllm)/ })).toBeVisible();
+    await expect(page.locator(".diagnostic-log").filter({ hasText: /mode: (unavailable|webllm)/ })).toBeVisible();
   });
 
   test("Assisted Memory を project key ごとに保存して復元できる", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     if (!(await page.getByRole("heading", { name: "Assisted Memory" }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();
@@ -116,7 +124,7 @@ test.describe("Git AI IDE workflow", () => {
   });
 
   test("Local Preview を editor tab として開き file tab に戻れる", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     await expect.poll(() => page.evaluate(() => window.crossOriginIsolated)).toBe(true);
 
@@ -125,11 +133,11 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-panel")).toBeVisible();
     await expect(page.getByLabel("Preview URL")).toBeVisible();
-    await expect(page.locator(".editor-surface .preview-iframe")).toBeVisible();
     await expect(page.locator(".editor-surface")).not.toContainText("Preview diagnostics");
 
     await page.getByLabel("Preview URL").fill("localhost:5173");
     await page.locator(".preview-addressbar").getByRole("button", { name: "開く" }).click();
+    await expect(page.locator(".editor-surface .preview-iframe")).toBeVisible();
     await expect(page.locator(".editor-surface .preview-iframe")).toHaveAttribute("src", "http://localhost:5173");
 
     await page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts" }).click();
@@ -139,7 +147,7 @@ test.describe("Git AI IDE workflow", () => {
   });
 
   test("Patch Queue で複数 proposal を積み、reject と apply ができる", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?fixture=demo");
 
     if (!(await page.getByRole("heading", { name: "Patch Queue" }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();

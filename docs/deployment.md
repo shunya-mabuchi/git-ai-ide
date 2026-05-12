@@ -40,7 +40,7 @@ pnpm --filter @git-ai-ide/worker exec wrangler d1 migrations apply git-ai-ide --
 
 ## 2. Worker を deploy する
 
-GitHub App をまだ設定しない場合でも deploy できます。その場合、Worker は demo mode を返します。
+GitHub App をまだ設定しない場合でも deploy できます。その場合、UI は GitHub setup required と表示し、push / PR 作成は実行しません。
 
 ```bash
 pnpm --filter @git-ai-ide/worker exec wrangler deploy
@@ -89,20 +89,20 @@ Callback / install まわりの詳細は [GitHub App セットアップ](github-
 
 - LLM 推論をサーバーで実行しない
 - WebLLM はユーザーのブラウザで実行する
-- Recorded AI fallback は setup なしで実行する
+- WebLLM はユーザーのブラウザで実行する
 - Worker は GitHub proxy と metadata API に限定する
 - D1 には code / diff / prompt 全文を保存しない
-- Demo mode は外部 API なしで動く
+- GitHub 未接続時は setup checklist を表示する
 
 ## 6. deploy 後の確認
 
 1. Pages URL を開く
-2. Demo repo が表示される
+2. 初期画面で GitHub repo 接続または local folder open が促される
 3. Patch Queue と Diff Preview が動く
 4. Local Preview panel に preflight が表示される
 5. Browser isolation が pass になり、`cross-origin isolation と SharedArrayBuffer が有効です。` と表示される
 6. WebContainer 対応 repo で Local Preview を実行し、Preview tab 内に dev server iframe が表示される
-7. GitHub Integration が demo mode または GitHub App mode を表示する
+7. GitHub Integration が GitHub setup required または GitHub App mode を表示する
 8. Worker `/health` が `ok: true` を返す
 9. GitHub App mode の場合、installation と repository が選択できる
 
@@ -110,5 +110,5 @@ Callback / install まわりの詳細は [GitHub App セットアップ](github-
 
 - WebContainer は cross-origin isolation とブラウザ対応状況に依存します
 - WebLLM は端末性能と WebGPU 対応状況に依存します
-- WebLLM が使えない端末では Recorded AI fallback に切り替わります
+- WebLLM が使えない端末では理由を表示し、AI patch 生成は実行しません
 - 任意 repo の runtime checks は best effort です

@@ -50,7 +50,7 @@ pnpm build
 
 ## Ollama legacy diagnostic
 
-Ollama は現時点では主機能ではなく、削除候補の legacy diagnostic として残しています。通常の UI では WebLLM / Recorded AI を使います。
+Ollama は現時点では主機能ではなく、削除候補の legacy diagnostic として残しています。通常の UI では WebLLM を使います。
 
 ```bash
 ollama serve
@@ -83,7 +83,7 @@ OLLAMA_E2E_REQUIRED=1 OLLAMA_E2E_MODEL=qwen2.5-coder:7b pnpm --filter @git-ai-id
 
 ## WebLLM 実モデルロード
 
-WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model Routing` から `WebLLM model load 診断` を実行すると、WebGPU 非対応環境では recorded fallback と理由を表示し、対応環境では npm dependency として bundle した `@mlc-ai/web-llm` で model load と短い chat completion を確認します。CDN dynamic import には依存しません。
+WebLLM は WebGPU 対応ブラウザで確認します。Git AI IDE の `Model Routing` から `WebLLM model load 診断` を実行すると、WebGPU 非対応環境では利用できない理由を表示し、対応環境では npm dependency として bundle した `@mlc-ai/web-llm` で model load と短い chat completion を確認します。CDN dynamic import には依存しません。
 
 既定の確認 model:
 

@@ -164,7 +164,7 @@ export type PullRequestFlowItem = {
 export type PullRequestFlowReadiness = {
   canCreatePullRequest: boolean;
   items: PullRequestFlowItem[];
-  mode: "demo" | "github";
+  mode: "github" | "setup_required";
   summary: "created" | "ready" | "waiting";
 };
 
@@ -248,10 +248,10 @@ export function evaluateSafetyGate(input: SafetyGateInput): SafetyGateResult {
 }
 
 export function evaluatePullRequestFlow(input: PullRequestFlowInput): PullRequestFlowReadiness {
-  const mode = input.githubConfigured ? "github" : "demo";
+  const mode = input.githubConfigured ? "github" : "setup_required";
   const repositorySelected = Boolean(input.repository.trim());
   const branchSelected = Boolean(input.branch.trim());
-  const installationReady = mode === "demo" || input.installationSelected;
+  const installationReady = mode === "github" && input.installationSelected;
   const created = Boolean(input.createdPrUrl);
   const canCreatePullRequest =
     input.safetyGateReady && input.branchPushed && repositorySelected && branchSelected && installationReady && !created;
@@ -263,10 +263,10 @@ export function evaluatePullRequestFlow(input: PullRequestFlowInput): PullReques
           ? input.installationSelected
             ? "GitHub App installation を選択済みです。"
             : "GitHub App mode では installation 選択が必要です。"
-          : "GitHub secrets 未設定時は demo mode で PR flow を確認します。",
+          : "GitHub App credentials が未設定のため PR flow は実行できません。",
       id: "mode",
-      label: mode === "github" ? "GitHub App mode" : "Demo mode",
-      status: mode === "github" && !input.installationSelected ? "blocked" : "pass",
+      label: mode === "github" ? "GitHub App mode" : "GitHub setup",
+      status: mode === "github" && input.installationSelected ? "pass" : "blocked",
     },
     {
       detail: repositorySelected ? `${input.repository} -> ${input.baseBranch}` : "PR 対象 repository が未選択です。",

@@ -2,7 +2,7 @@ import { webLlmModelCatalog } from "./webLlmModelCatalog";
 
 export type WebLlmSmokeResult = {
   log: string;
-  mode: "recorded" | "webllm";
+  mode: "unavailable" | "webllm";
   modelId: string;
   ok: boolean;
 };
@@ -18,11 +18,11 @@ export async function runWebLlmSmokeTest(input?: {
   if (!hasWebGpu) {
     return {
       log: [
-        "mode: recorded",
+        "mode: unavailable",
         `model: ${modelId}`,
         "WebGPU を検出できません。WebLLM 実モデルロードは WebGPU 対応ブラウザで確認してください。",
       ].join("\n"),
-      mode: "recorded",
+      mode: "unavailable",
       modelId,
       ok: true,
     };
@@ -48,8 +48,8 @@ export async function runWebLlmSmokeTest(input?: {
 
     if (!text) {
       return {
-        log: ["mode: recorded", `model: ${modelId}`, "WebLLM completion が空でした。Recorded fallback として扱います。"].join("\n"),
-        mode: "recorded",
+        log: ["mode: unavailable", `model: ${modelId}`, "WebLLM completion が空でした。AI proposal は生成できません。"].join("\n"),
+        mode: "unavailable",
         modelId,
         ok: true,
       };
@@ -64,11 +64,11 @@ export async function runWebLlmSmokeTest(input?: {
   } catch (error) {
     return {
       log: [
-        "mode: recorded",
+        "mode: unavailable",
         `model: ${modelId}`,
         error instanceof Error ? `WebLLM model load に失敗しました: ${error.message}` : "WebLLM model load に失敗しました。",
       ].join("\n"),
-      mode: "recorded",
+      mode: "unavailable",
       modelId,
       ok: true,
     };
