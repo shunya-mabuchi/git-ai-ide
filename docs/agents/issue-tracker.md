@@ -640,6 +640,39 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `pnpm --filter @git-ai-ide/web build` 相当成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 相当成功
 
+## GAI-032: GitHub App 実 credentials E2E を完了する
+
+- 状態: 未着手
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
+- 担当: 未定
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/54
+- 背景: GitHub App / Cloudflare Worker の境界実装はあるが、実 credentials を使った selected repository への branch push / PR 作成 / issue close までの E2E は未完了。
+- 現在の確認結果:
+  - GitHub CLI は repo scope で認証済み
+  - `apps/worker/.dev.vars` は未作成
+  - GitHub App の実 `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_SLUG` は未設定
+  - Wrangler は Cloudflare 未ログイン
+- スコープ:
+  - GitHub App を作成し、selected repository のみに install する
+  - Worker local secrets または Cloudflare Worker secrets に GitHub App credentials を設定する
+  - Worker を起動または deploy する
+  - Web app から installation / repository 一覧を取得できることを確認する
+  - selected repo に branch push する
+  - PR を作成する
+  - PR body の close keyword で issue が close されることを確認する
+- 受け入れ条件:
+  - GitHub Integration が Demo mode ではなく GitHub App configured / selected repo mode になる
+  - installation と selected repository が UI で選択できる
+  - branch push が実 GitHub branch を作成する
+  - PR 作成で GitHub 上に PR URL ができる
+  - close keyword が対象 issue に紐づく
+- 検証:
+  - Worker `/api/github/setup` が `appConfigured: true` を返す
+  - Worker `/api/github/installations` が installation を返す
+  - Worker `/api/github/repos?installation_id=...` が selected repo を返す
+  - UI から branch push / PR 作成まで確認する
+  - 必要なら Playwright の実 credentials 用 E2E を追加する
+
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
 - 状態: 完了
