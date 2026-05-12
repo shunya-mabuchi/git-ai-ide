@@ -697,6 +697,16 @@ button {
   padding: 8px;
 }
 
+.icon-action.compact {
+  height: 28px;
+  padding: 0 9px;
+}
+
+.icon-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .conflict-box strong {
   color: #ffb4a8;
   font-size: 12px;
@@ -1000,6 +1010,21 @@ button {
   overflow-x: auto;
 }
 
+.editor-tab-actions {
+  align-items: center;
+  color: #9aa6b2;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.editor-tab-actions > span {
+  font-size: 11px;
+}
+
 .tab {
   align-items: center;
   background: #1f242b;
@@ -1036,6 +1061,15 @@ button {
 .tab.active {
   background: #11181d;
   color: #eef3f6;
+}
+
+.dirty-dot {
+  background: #f2c94c;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 7px;
+  margin-left: auto;
+  width: 7px;
 }
 
 .editor-surface,
