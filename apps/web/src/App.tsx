@@ -2202,43 +2202,107 @@ function LocalPreviewPanel({
         : previewPreflight.canAttemptWebContainer
           ? "WebContainer candidate"
           : "Recorded fallback";
+  const recordedPreviewHtml = createRecordedPreviewHtml(workspaceName, previewRunState);
 
   return (
     <div className="preview-panel">
-      <div className="preview-info">
-        <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
-        <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
-        <span>mode: {resolvedPreviewMode}</span>
-        <span>{previewPreflight.reason}</span>
-        {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
-        <ul className="preview-preflight">
-          {previewPreflight.items.map((item) => (
-            <li className={`preview-preflight-${item.status}`} key={item.id}>
-              {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "warning" ? <TriangleAlert size={14} /> : <Circle size={14} />}
-              <span>
-                <strong>{item.label}</strong>
-                {item.detail}
-              </span>
-            </li>
-          ))}
-        </ul>
+      <div className="preview-statusbar">
+        <div>
+          <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
+          <span>{previewUrl ? previewUrl : previewAvailable ? `${previewCommand} / ${resolvedPreviewMode}` : "dev または preview script がありません。"}</span>
+        </div>
+        <span className={`preview-badge preview-badge-${previewRunState}`}>{previewRunState === "ready" ? "Ready" : previewRunState === "running" ? "Starting" : "Idle"}</span>
       </div>
       {previewUrl ? (
         <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
+      ) : previewAvailable ? (
+        <iframe className="preview-iframe" title={`${workspaceName} recorded preview`} srcDoc={recordedPreviewHtml} />
       ) : (
         <div className="preview-frame">
           <strong>{workspaceName}</strong>
           <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
-          <p>
-            {previewAvailable
-              ? "対応環境では dev server の URL を取得し、この領域に iframe として表示します。非対応環境では recorded fallback として確認手順を表示します。"
-              : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
-          </p>
+          <p>この repo では自動 preview の候補がありません。</p>
         </div>
       )}
-      <pre className="preview-log">{previewLog}</pre>
+      <details className="preview-details">
+        <summary>Preview diagnostics</summary>
+        <div className="preview-info">
+          <span>{previewPreflight.reason}</span>
+          <ul className="preview-preflight">
+            {previewPreflight.items.map((item) => (
+              <li className={`preview-preflight-${item.status}`} key={item.id}>
+                {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "warning" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                <span>
+                  <strong>{item.label}</strong>
+                  {item.detail}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <pre className="preview-log">{previewLog}</pre>
+        </div>
+      </details>
     </div>
   );
+}
+
+function createRecordedPreviewHtml(workspaceName: string, previewRunState: "idle" | "running" | "ready") {
+  const status = previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle";
+
+  return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f5f7f8; color: #172026; }
+    .shell { min-height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
+    header { align-items: center; background: #ffffff; border-bottom: 1px solid #dfe5e8; display: flex; justify-content: space-between; padding: 0 22px; }
+    strong { font-size: 15px; }
+    .badge { background: #e9f7ef; border: 1px solid #bfe9cf; border-radius: 999px; color: #166534; font-size: 12px; padding: 5px 10px; }
+    main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr) 300px; padding: 22px; }
+    .panel { background: #ffffff; border: 1px solid #dfe5e8; border-radius: 8px; box-shadow: 0 10px 30px rgba(20, 31, 36, 0.06); min-width: 0; padding: 18px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { color: #5f6f78; font-size: 14px; line-height: 1.6; margin: 0; }
+    .preview-list { display: grid; gap: 10px; margin-top: 18px; }
+    .row { align-items: center; border: 1px solid #e5ebee; border-radius: 6px; display: flex; justify-content: space-between; padding: 12px; }
+    .row span { color: #5f6f78; font-size: 13px; }
+    button { background: #172026; border: 0; border-radius: 6px; color: #ffffff; font: inherit; padding: 9px 12px; }
+    aside { display: grid; gap: 10px; }
+    .metric { display: grid; gap: 4px; }
+    .metric b { font-size: 20px; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <strong>${escapeHtml(workspaceName)}</strong>
+      <span class="badge">${status}</span>
+    </header>
+    <main>
+      <section class="panel">
+        <h1>PR summary workflow</h1>
+        <p>Recorded preview shows the shape of the app while WebContainer or localhost preview is unavailable.</p>
+        <div class="preview-list">
+          <div class="row"><div><strong>Branch Goal</strong><br><span>PR 要約生成を改善する</span></div><button>Review</button></div>
+          <div class="row"><div><strong>Patch Queue</strong><br><span>1 structured edit ready</span></div><button>Diff</button></div>
+          <div class="row"><div><strong>Safety Gate</strong><br><span>Diff / Tests / Preview / PR draft</span></div><button>Run</button></div>
+        </div>
+      </section>
+      <aside>
+        <section class="panel metric"><span>Changed files</span><b>1</b><p>src/features/pr-summary/generateSummary.ts</p></section>
+        <section class="panel metric"><span>Runtime</span><b>Demo</b><p>Recorded fallback</p></section>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function ExplorerTree({

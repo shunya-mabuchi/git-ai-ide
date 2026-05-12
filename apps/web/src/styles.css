@@ -1166,15 +1166,68 @@ button {
 
 .preview-panel {
   display: grid;
-  gap: 10px;
-  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  gap: 8px;
+  grid-template-rows: 38px minmax(0, 1fr) auto;
   min-height: 100%;
   padding: 10px;
 }
 
+.preview-statusbar {
+  align-items: center;
+  background: #10161b;
+  border: 1px solid #2a2f36;
+  border-radius: 6px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.preview-statusbar > div {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.preview-statusbar strong {
+  color: #eef3f6;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.preview-statusbar span {
+  color: #9aa6b2;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-badge {
+  border: 1px solid #33414b;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  padding: 3px 8px;
+}
+
+.preview-badge-ready {
+  color: #7fda9b;
+}
+
+.preview-badge-running {
+  color: #d7c47a;
+}
+
+.preview-badge-idle {
+  color: #9aa6b2;
+}
+
 .preview-info,
 .preview-frame,
-.preview-log {
+.preview-log,
+.preview-details {
   background: #10161b;
   border: 1px solid #2a2f36;
   border-radius: 6px;
@@ -1185,7 +1238,23 @@ button {
   align-content: start;
   display: grid;
   gap: 6px;
+  border: 0;
   padding: 10px;
+}
+
+.preview-details {
+  color: #d6dee6;
+}
+
+.preview-details summary {
+  color: #9aa6b2;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.preview-details[open] summary {
+  border-bottom: 1px solid #2a2f36;
 }
 
 .preview-info strong,
@@ -1270,6 +1339,7 @@ button {
 }
 
 .preview-log {
+  border: 0;
   color: #d6dee6;
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
