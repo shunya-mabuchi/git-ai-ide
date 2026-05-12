@@ -739,6 +739,27 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - WebGPU 非対応 CI では skip / fallback が確認できる
   - WebGPU 対応端末では実 model load を手動確認する
 
+## GAI-036: GitHub branch / commit 実操作 UI を追加する
+
+- 状態: 進行中
+- ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/68
+- 背景: 実 GitHub repository を操作する IDE として、repo 選択後に branch list / commit list / branch 作成を GitHub App 経由で扱える必要がある。
+- スコープ:
+  - Worker に GitHub branches / commits / create branch API を追加する
+  - Web client に branches / commits / create branch 呼び出しを追加する
+  - real GitHub mode では Source Control の branch / history を remote data で表示する
+  - branch 作成と remote refresh の UI を追加する
+- 受け入れ条件:
+  - selected repository の branch list を取得できる
+  - selected branch の commit list を取得できる
+  - GitHub App mode で branch を作成できる
+  - demo mode では既存の simulation 表示を維持する
+- 検証:
+  - Web typecheck / unit / E2E / build
+  - Worker typecheck / wrangler dry-run
+
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
 - 状態: 完了

@@ -20,6 +20,22 @@ type GitHubPullRequestResponse = {
   number: number;
 };
 
+type GitHubBranch = {
+  commitSha: string;
+  default: boolean;
+  name: string;
+  protected: boolean;
+};
+
+type GitHubCommit = {
+  author: string;
+  branch: string;
+  message: string;
+  sha: string;
+  time: string;
+  url: string;
+};
+
 const json = (data: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(data, null, 2), {
     ...init,
@@ -132,6 +148,146 @@ export default {
       }));
 
       return json({ mode: "github", repositories });
+    }
+
+    if (url.pathname === "/api/github/branches" && request.method === "GET") {
+      const repository = url.searchParams.get("repository");
+      const installationId = Number(url.searchParams.get("installation_id"));
+      const defaultBranch = url.searchParams.get("default_branch") ?? "main";
+
+      if (!repository) {
+        return json({ error: "repository is required" }, { status: 400 });
+      }
+
+      if (!isGitHubConfigured(env) || repository.startsWith("demo/")) {
+        return json({
+          branches: demoBranches(defaultBranch),
+          mode: "demo",
+        });
+      }
+
+      if (!installationId) {
+        return json({ error: "installation_id is required for GitHub mode" }, { status: 400 });
+      }
+
+      const token = await createInstallationToken(env, installationId);
+      const response = await fetch(`https://api.github.com/repos/${repository}/branches?per_page=100`, {
+        headers: githubHeaders(token),
+      });
+
+      if (!response.ok) {
+        return json({ error: "Failed to load GitHub branches" }, { status: response.status });
+      }
+
+      const body = (await response.json()) as Array<{
+        commit: { sha: string };
+        name: string;
+        protected: boolean;
+      }>;
+      const branches: GitHubBranch[] = body.map((branch) => ({
+        commitSha: branch.commit.sha,
+        default: branch.name === defaultBranch,
+        name: branch.name,
+        protected: branch.protected,
+      }));
+
+      return json({ branches, mode: "github" });
+    }
+
+    if (url.pathname === "/api/github/branches" && request.method === "POST") {
+      const body = (await request.json().catch(() => null)) as
+        | {
+            baseBranch?: string;
+            branch?: string;
+            installationId?: number;
+            repository?: string;
+          }
+        | null;
+
+      if (!body?.repository || !body.branch) {
+        return json({ error: "repository and branch are required" }, { status: 400 });
+      }
+
+      if (!isGitHubConfigured(env) || body.repository.startsWith("demo/")) {
+        return json({
+          branch: {
+            commitSha: `demo-${crypto.randomUUID()}`,
+            default: false,
+            name: body.branch,
+            protected: false,
+          },
+          mode: "demo",
+        });
+      }
+
+      if (!body.installationId) {
+        return json({ error: "installationId is required for GitHub mode" }, { status: 400 });
+      }
+
+      const token = await createInstallationToken(env, body.installationId);
+      await ensureBranch(token, body.repository, body.baseBranch ?? "main", body.branch);
+
+      return json({
+        branch: {
+          commitSha: await readBranchSha(token, body.repository, body.branch),
+          default: false,
+          name: body.branch,
+          protected: false,
+        },
+        mode: "github",
+      });
+    }
+
+    if (url.pathname === "/api/github/commits" && request.method === "GET") {
+      const repository = url.searchParams.get("repository");
+      const branch = url.searchParams.get("branch") ?? url.searchParams.get("default_branch") ?? "main";
+      const installationId = Number(url.searchParams.get("installation_id"));
+
+      if (!repository) {
+        return json({ error: "repository is required" }, { status: 400 });
+      }
+
+      if (!isGitHubConfigured(env) || repository.startsWith("demo/")) {
+        return json({
+          commits: demoCommits(branch),
+          mode: "demo",
+        });
+      }
+
+      if (!installationId) {
+        return json({ error: "installation_id is required for GitHub mode" }, { status: 400 });
+      }
+
+      const token = await createInstallationToken(env, installationId);
+      const response = await fetch(
+        `https://api.github.com/repos/${repository}/commits?sha=${encodeURIComponent(branch)}&per_page=20`,
+        {
+          headers: githubHeaders(token),
+        },
+      );
+
+      if (!response.ok) {
+        return json({ error: "Failed to load GitHub commits" }, { status: response.status });
+      }
+
+      const body = (await response.json()) as Array<{
+        commit: {
+          author?: { date?: string; name?: string };
+          message: string;
+        };
+        html_url: string;
+        sha: string;
+      }>;
+      const commits: GitHubCommit[] = body.map((commit) => ({
+        author: commit.commit.author?.name ?? "unknown",
+        branch,
+        message: commit.commit.message.split("\n")[0] ?? "Commit",
+        sha: commit.sha,
+        time: commit.commit.author?.date ?? "",
+        url: commit.html_url,
+      }));
+
+      return json({ commits, mode: "github" });
     }
 
     if (url.pathname === "/api/github/prs" && request.method === "POST") {
@@ -282,6 +438,44 @@ function demoRepository(): GitHubRepository {
   };
 }
 
+function demoBranches(defaultBranch: string): GitHubBranch[] {
+  return [
+    {
+      commitSha: "9c12d4e",
+      default: true,
+      name: defaultBranch,
+      protected: false,
+    },
+    {
+      commitSha: "b41f7a2",
+      default: false,
+      name: "feature/pr-summary",
+      protected: false,
+    },
+  ];
+}
+
+function demoCommits(branch: string): GitHubCommit[] {
+  return [
+    {
+      author: "demo",
+      branch,
+      message: "Add PR summary generator",
+      sha: "b41f7a2",
+      time: "demo fixture",
+      url: "",
+    },
+    {
+      author: "demo",
+      branch,
+      message: "Create typed summary contract",
+      sha: "9c12d4e",
+      time: "demo fixture",
+      url: "",
+    },
+  ];
+}
+
 async function createDemoPullRequest(
   env: Env,
   body: {
@@ -405,6 +599,19 @@ async function ensureBranch(token: string, repository: string, baseBranch: strin
   if (!created.ok) {
     throw new Error(`Failed to create branch: ${created.status}`);
   }
+}
+
+async function readBranchSha(token: string, repository: string, branch: string) {
+  const response = await fetch(`https://api.github.com/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`, {
+    headers: githubHeaders(token),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load branch: ${response.status}`);
+  }
+
+  const body = (await response.json()) as { object: { sha: string } };
+  return body.object.sha;
 }
 
 async function writeContentChange(

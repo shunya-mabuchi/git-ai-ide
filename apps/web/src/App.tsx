@@ -31,10 +31,15 @@ import { evaluatePullRequestFlow, evaluateSafetyGate, type PatchProposal } from 
 import { demoBranchGoal, demoFiles, demoPatch, demoRepoMap } from "./demo/demoRepo";
 import {
   createGitHubPullRequest,
+  createGitHubBranch,
+  loadGitHubBranches,
+  loadGitHubCommits,
   loadGitHubInstallations,
   loadGitHubRepositories,
   loadGitHubSetup,
   pushGitHubFiles,
+  type GitHubBranchOption,
+  type GitHubCommitOption,
   type GitHubInstallationOption,
   type GitHubRepositoryOption,
 } from "./github/githubClient";
@@ -182,11 +187,15 @@ export function App() {
   const [githubInstallUrl, setGithubInstallUrl] = useState("");
   const [githubInstallations, setGithubInstallations] = useState<GitHubInstallationOption[]>([]);
   const [githubRepositories, setGithubRepositories] = useState<GitHubRepositoryOption[]>([]);
+  const [githubBranches, setGithubBranches] = useState<GitHubBranchOption[]>([]);
+  const [githubCommits, setGithubCommits] = useState<GitHubCommitOption[]>([]);
   const [githubSetupState, setGithubSetupState] = useState<GitHubSetupState>("checking");
   const [selectedRepository, setSelectedRepository] = useState("demo/pr-helper-mini");
   const [selectedInstallationId, setSelectedInstallationId] = useState<number | undefined>();
   const [githubStatusMessage, setGithubStatusMessage] = useState("GitHub Worker 未確認");
   const [isLoadingGitHubRepositories, setIsLoadingGitHubRepositories] = useState(false);
+  const [isLoadingRemoteGit, setIsLoadingRemoteGit] = useState(false);
+  const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [isPushingBranch, setIsPushingBranch] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [aiRuntimeMode, setAiRuntimeMode] = useState<AiRuntimeMode>("recorded");
@@ -378,6 +387,7 @@ export function App() {
   );
   const sourceControlSummary = summarizeGitStatus(gitStatus);
   const repositoryIsSelectable = githubRepositories.some((repository) => repository.fullName === selectedRepository);
+  const selectedRepositoryOption = githubRepositories.find((repository) => repository.fullName === selectedRepository);
   const realGitHubMode = githubSetupState === "ready" && githubConfigured && Boolean(selectedInstallationId) && repositoryIsSelectable;
   const sourceControlModeLabel = realGitHubMode ? "GitHub Source Control" : "Demo Source Control";
   const sourceControlModeDetail = realGitHubMode
@@ -429,63 +439,88 @@ export function App() {
     [githubConfigured, githubSetupState, realGitHubMode, selectedInstallationId, selectedRepository],
   );
   const branchSummaries = useMemo<BranchSummary[]>(
-    () => [
-      {
-        ahead: 0,
-        behind: 0,
-        label: realGitHubMode ? "base branch" : "demo base branch",
-        name: "main",
-        role: "base",
-        status: branchName === "main" ? "current" : "ready",
-      },
-      {
-        ahead: commitCreated ? 1 : gitStatus.hasChanges ? 0 : branchPushed ? 1 : 0,
-        behind: 0,
-        label: realGitHubMode ? "working branch" : "browser snapshot branch",
-        name: branchName,
-        role: "working",
-        status: gitStatus.hasChanges ? "needs-work" : "current",
-      },
-      {
-        ahead: branchPushed ? 1 : 0,
-        behind: branchPushed ? 0 : 1,
-        label: realGitHubMode ? "PR branch" : "demo PR branch preview",
-        name: realGitHubMode ? `${branchName}-review` : `${branchName}-demo-preview`,
-        role: "review",
-        status: branchPushed ? "ready" : "needs-work",
-      },
-    ],
-    [branchName, branchPushed, commitCreated, gitStatus.hasChanges, realGitHubMode],
+    () => {
+      if (realGitHubMode && githubBranches.length > 0) {
+        return githubBranches.map((branch) => ({
+          ahead: branch.name === branchName && (commitCreated || branchPushed) ? 1 : 0,
+          behind: 0,
+          label: branch.default ? "default branch" : branch.protected ? "protected branch" : "remote branch",
+          name: branch.name,
+          role: branch.default ? "base" : branch.name === branchName ? "working" : "review",
+          status: branch.name === branchName ? "current" : "ready",
+        }));
+      }
+
+      return [
+        {
+          ahead: 0,
+          behind: 0,
+          label: realGitHubMode ? "base branch" : "demo base branch",
+          name: "main",
+          role: "base",
+          status: branchName === "main" ? "current" : "ready",
+        },
+        {
+          ahead: commitCreated ? 1 : gitStatus.hasChanges ? 0 : branchPushed ? 1 : 0,
+          behind: 0,
+          label: realGitHubMode ? "working branch" : "browser snapshot branch",
+          name: branchName,
+          role: "working",
+          status: gitStatus.hasChanges ? "needs-work" : "current",
+        },
+        {
+          ahead: branchPushed ? 1 : 0,
+          behind: branchPushed ? 0 : 1,
+          label: realGitHubMode ? "PR branch" : "demo PR branch preview",
+          name: realGitHubMode ? `${branchName}-review` : `${branchName}-demo-preview`,
+          role: "review",
+          status: branchPushed ? "ready" : "needs-work",
+        },
+      ];
+    },
+    [branchName, branchPushed, commitCreated, gitStatus.hasChanges, githubBranches, realGitHubMode],
   );
   const commitHistory = useMemo<CommitHistoryItem[]>(
-    () => [
-      ...(commitCreated
-        ? [
-            {
-              author: realGitHubMode ? "You + GitHub" : "You + Git AI IDE demo",
-              branch: branchName,
-              message: commitMessage.split("\n")[0] || "Improve PR summary generation",
-              sha: pushedCommitSha.slice(0, 7) || "local01",
-              time: branchPushed ? (realGitHubMode ? "pushed" : "demo pushed") : "local draft",
-            },
-          ]
-        : []),
-      {
-        author: realGitHubMode ? "remote" : "demo fixture",
-        branch: "main",
-        message: "Add PR summary generator",
-        sha: "b41f7a2",
-        time: realGitHubMode ? "remote base" : "demo base",
-      },
-      {
-        author: realGitHubMode ? "remote" : "demo fixture",
-        branch: "main",
-        message: "Create typed summary contract",
-        sha: "9c12d4e",
-        time: realGitHubMode ? "remote base" : "demo base",
-      },
-    ],
-    [branchName, branchPushed, commitCreated, commitMessage, pushedCommitSha, realGitHubMode],
+    () => {
+      if (realGitHubMode && githubCommits.length > 0) {
+        return githubCommits.map((commit) => ({
+          author: commit.author,
+          branch: commit.branch,
+          message: commit.message,
+          sha: commit.sha.slice(0, 7),
+          time: commit.time ? formatDateTime(commit.time) : "remote",
+        }));
+      }
+
+      return [
+        ...(commitCreated
+          ? [
+              {
+                author: realGitHubMode ? "You + GitHub" : "You + Git AI IDE demo",
+                branch: branchName,
+                message: commitMessage.split("\n")[0] || "Improve PR summary generation",
+                sha: pushedCommitSha.slice(0, 7) || "local01",
+                time: branchPushed ? (realGitHubMode ? "pushed" : "demo pushed") : "local draft",
+              },
+            ]
+          : []),
+        {
+          author: realGitHubMode ? "remote" : "demo fixture",
+          branch: "main",
+          message: "Add PR summary generator",
+          sha: "b41f7a2",
+          time: realGitHubMode ? "remote base" : "demo base",
+        },
+        {
+          author: realGitHubMode ? "remote" : "demo fixture",
+          branch: "main",
+          message: "Create typed summary contract",
+          sha: "9c12d4e",
+          time: realGitHubMode ? "remote base" : "demo base",
+        },
+      ];
+    },
+    [branchName, branchPushed, commitCreated, commitMessage, githubCommits, pushedCommitSha, realGitHubMode],
   );
   const mergeReadiness = useMemo<MergeReadinessItem[]>(
     () => [
@@ -1042,6 +1077,74 @@ export function App() {
     }
   };
 
+  const refreshRemoteGit = async (input?: { branch?: string; repository?: GitHubRepositoryOption }) => {
+    const repository = input?.repository ?? selectedRepositoryOption;
+    const branch = input?.branch ?? branchName;
+
+    if (!repository?.installationId) {
+      setGithubBranches([]);
+      setGithubCommits([]);
+      return;
+    }
+
+    setIsLoadingRemoteGit(true);
+    try {
+      const [branches, commits] = await Promise.all([
+        loadGitHubBranches({
+          defaultBranch: repository.defaultBranch,
+          installationId: repository.installationId,
+          repository: repository.fullName,
+        }),
+        loadGitHubCommits({
+          branch,
+          defaultBranch: repository.defaultBranch,
+          installationId: repository.installationId,
+          repository: repository.fullName,
+        }),
+      ]);
+      setGithubBranches(branches);
+      setGithubCommits(commits);
+      setGithubStatusMessage(`Remote git loaded: ${repository.fullName}`);
+    } catch (error) {
+      setGithubBranches([]);
+      setGithubCommits([]);
+      setGithubStatusMessage(error instanceof Error ? error.message : "GitHub branch / commit を取得できませんでした。");
+    } finally {
+      setIsLoadingRemoteGit(false);
+    }
+  };
+
+  const createRemoteBranch = async () => {
+    if (!selectedRepositoryOption?.installationId || !branchName.trim()) return;
+
+    setIsCreatingBranch(true);
+    try {
+      const branch = await createGitHubBranch({
+        baseBranch: mergeTargetBranch || selectedRepositoryOption.defaultBranch,
+        branch: branchName.trim(),
+        installationId: selectedRepositoryOption.installationId,
+        repository: selectedRepositoryOption.fullName,
+      });
+      setGithubBranches((current) => [branch, ...current.filter((item) => item.name !== branch.name)]);
+      setGithubStatusMessage(`Branch created: ${branch.name}`);
+      await refreshRemoteGit({ branch: branch.name, repository: selectedRepositoryOption });
+    } catch (error) {
+      setGithubStatusMessage(error instanceof Error ? error.message : "GitHub branch を作成できませんでした。");
+    } finally {
+      setIsCreatingBranch(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!realGitHubMode) {
+      setGithubBranches([]);
+      setGithubCommits([]);
+      return;
+    }
+
+    void refreshRemoteGit();
+  }, [branchName, realGitHubMode, selectedInstallationId, selectedRepository]);
+
   const runWorkspaceChecks = async () => {
     if (!patchApplied) return;
 
@@ -1545,6 +1648,14 @@ export function App() {
                     <span>Branch</span>
                     <input value={branchName} onChange={(event) => setBranchName(event.target.value)} />
                   </label>
+                  <div className="branch-actions">
+                    <button className="button secondary" disabled={!realGitHubMode || isLoadingRemoteGit} onClick={() => void refreshRemoteGit()}>
+                      {isLoadingRemoteGit ? "Loading" : "Remote 更新"}
+                    </button>
+                    <button className="button secondary" disabled={!realGitHubMode || !branchName.trim() || isCreatingBranch} onClick={createRemoteBranch}>
+                      {isCreatingBranch ? "作成中" : "Branch 作成"}
+                    </button>
+                  </div>
                   <div className="branch-goal-card">
                     <span>Branch Goal</span>
                     <strong>{extractMarkdownTitle(branchGoalMarkdown) || demoBranchGoal.title}</strong>
@@ -1705,6 +1816,9 @@ export function App() {
                           const repository = githubRepositories.find((item) => item.fullName === event.target.value);
                           setSelectedRepository(event.target.value);
                           setSelectedInstallationId(repository?.installationId);
+                          if (repository?.defaultBranch) setBranchName(repository.defaultBranch);
+                          setBranchPushed(false);
+                          setCreatedPrUrl("");
                         }}
                       >
                         {githubRepositories.map((repository) => (
