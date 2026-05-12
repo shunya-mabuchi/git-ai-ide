@@ -688,16 +688,20 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-032: GitHub App 実 credentials E2E を完了する
 
-- 状態: 未着手
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:github`, `優先度:p1`
-- 担当: 未定
+- 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/54
-- 背景: GitHub App / Cloudflare Worker の境界実装はあるが、実 credentials を使った selected repository への branch push / PR 作成 / issue close までの E2E は未完了。
-- 現在の確認結果:
-  - GitHub CLI は repo scope で認証済み
-  - `apps/worker/.dev.vars` は未作成
-  - GitHub App の実 `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_SLUG` は未設定
-  - Wrangler は Cloudflare 未ログイン
+- 背景: GitHub App / Cloudflare Worker の境界実装はあるが、実 credentials を使った selected repository への branch push / PR 作成 / issue close までの E2E は未完了だった。
+- 実施内容:
+  - GitHub App `git-ai-ide` を作成した
+  - `shunya-mabuchi/git-ai-ide` のみに install した
+  - GitHub App private key を `private-notes/secrets` に移動し、PKCS#8 に変換した
+  - `apps/worker/.dev.vars` に `GITHUB_APP_ID` / `GITHUB_APP_SLUG` / `GITHUB_APP_PRIVATE_KEY` を設定した
+  - local Worker で GitHub App mode を起動した
+  - local D1 migration を適用した
+  - Worker API から selected repo の branch 作成 / push-files / PR 作成を実行した
+  - PR body の `Closes #77` で merge 後に issue #77 が close されることを確認した
 - スコープ:
   - GitHub App を作成し、selected repository のみに install する
   - Worker local secrets または Cloudflare Worker secrets に GitHub App credentials を設定する
@@ -708,16 +712,23 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - PR body の close keyword で issue が close されることを確認する
 - 受け入れ条件:
   - GitHub Integration が Demo mode ではなく GitHub App configured / selected repo mode になる
-  - installation と selected repository が UI で選択できる
+  - installation と selected repository が UI / Worker API で選択できる
   - branch push が実 GitHub branch を作成する
   - PR 作成で GitHub 上に PR URL ができる
   - close keyword が対象 issue に紐づく
 - 検証:
-  - Worker `/api/github/setup` が `appConfigured: true` を返す
-  - Worker `/api/github/installations` が installation を返す
-  - Worker `/api/github/repos?installation_id=...` が selected repo を返す
-  - UI から branch push / PR 作成まで確認する
-  - 必要なら Playwright の実 credentials 用 E2E を追加する
+  - `GET /api/github/setup`: `appConfigured: true`
+  - `GET /api/github/installations`: `mode: github`, `installation_id: 131652249`
+  - `GET /api/github/repos?installation_id=131652249`: `shunya-mabuchi/git-ai-ide`
+  - `POST /api/github/branches`: `feature/github-app-real-e2e-77b` 作成成功
+  - `POST /api/github/push-files`: commit `a6e18bca8466b6cb4341af315c01650dc3752f87` 作成成功
+  - `POST /api/github/prs`: PR #79 作成成功
+  - GitHub Actions: PR #79 pass
+  - PR #79 merge 後、issue #77 が close 済み
+- メモ:
+  - GitHub から生成される private key が `RSA PRIVATE KEY` の場合、Worker WebCrypto 用に PKCS#8 `PRIVATE KEY` へ変換する
+  - local Worker で PR metadata を保存するには `wrangler d1 migrations apply git-ai-ide --local` が必要
+  - Cloudflare deploy は公開 URL で real mode を動かす場合に必要。ローカル実 E2E には必須ではない
 
 ## GAI-033: WebContainer iframe preview E2E を完了する
 
