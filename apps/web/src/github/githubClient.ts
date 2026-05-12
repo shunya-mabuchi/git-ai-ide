@@ -78,6 +78,7 @@ export type CreatePullRequestResult = {
     url: string;
   };
   sessionId: string;
+  warning?: string;
 };
 
 const workerBaseUrl =
@@ -137,8 +138,7 @@ export async function createGitHubBranch(input: CreateGitHubBranchInput): Promis
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.error ?? "GitHub branch を作成できませんでした。");
+    throw new Error(await readGitHubApiError(response, "GitHub branch を作成できませんでした。"));
   }
 
   const body = (await response.json()) as {
@@ -178,8 +178,7 @@ export async function createGitHubPullRequest(input: CreatePullRequestInput): Pr
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.error ?? "Pull request を作成できませんでした。");
+    throw new Error(await readGitHubApiError(response, "Pull request を作成できませんでした。"));
   }
 
   return response.json();
@@ -195,9 +194,26 @@ export async function pushGitHubFiles(input: PushFilesInput): Promise<PushFilesR
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => null);
-    throw new Error(errorBody?.error ?? "Branch に変更を push できませんでした。");
+    throw new Error(await readGitHubApiError(response, "Branch に変更を push できませんでした。"));
   }
 
   return response.json();
+}
+
+async function readGitHubApiError(response: Response, fallback: string) {
+  const errorBody = (await response.json().catch(() => null)) as { error?: string; github?: string } | null;
+  const githubMessage = parseGitHubErrorMessage(errorBody?.github);
+  return [errorBody?.error, githubMessage, `HTTP ${response.status}`].filter(Boolean).join(" / ") || fallback;
+}
+
+function parseGitHubErrorMessage(value?: string) {
+  if (!value) return "";
+
+  try {
+    const parsed = JSON.parse(value) as { errors?: Array<{ message?: string }>; message?: string };
+    const detail = parsed.errors?.map((error) => error.message).filter(Boolean).join(" / ");
+    return detail ? `${parsed.message}: ${detail}` : parsed.message ?? value;
+  } catch {
+    return value;
+  }
 }

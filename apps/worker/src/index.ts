@@ -333,7 +333,7 @@ export default {
       }
 
       const pullRequest = (await response.json()) as GitHubPullRequestResponse;
-      const sessionId = await savePullRequestMetadata(env, {
+      const metadataResult = await savePullRequestMetadata(env, {
         baseBranch: body.baseBranch ?? "main",
         branch: body.branch,
         prNumber: pullRequest.number,
@@ -348,7 +348,8 @@ export default {
           number: pullRequest.number,
           url: pullRequest.html_url,
         },
-        sessionId,
+        sessionId: metadataResult.sessionId,
+        warning: metadataResult.warning,
       });
     }
 
@@ -520,21 +521,31 @@ async function savePullRequestMetadata(
 ) {
   const sessionId = crypto.randomUUID();
 
-  await env.DB.prepare(
-    `insert into pr_flow_sessions (id, repository, branch, base_branch, branch_goal_summary, status, pr_url)
-     values (?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(sessionId, input.repository, input.branch, input.baseBranch, input.title, "pr_created", input.prUrl)
-    .run();
+  try {
+    await env.DB.prepare(
+      `insert into pr_flow_sessions (id, repository, branch, base_branch, branch_goal_summary, status, pr_url)
+       values (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(sessionId, input.repository, input.branch, input.baseBranch, input.title, "pr_created", input.prUrl)
+      .run();
 
-  await env.DB.prepare(
-    `insert into created_prs (id, session_id, github_pr_number, pr_url, title)
-     values (?, ?, ?, ?, ?)`,
-  )
-    .bind(crypto.randomUUID(), sessionId, input.prNumber, input.prUrl, input.title)
-    .run();
+    await env.DB.prepare(
+      `insert into created_prs (id, session_id, github_pr_number, pr_url, title)
+       values (?, ?, ?, ?, ?)`,
+    )
+      .bind(crypto.randomUUID(), sessionId, input.prNumber, input.prUrl, input.title)
+      .run();
 
-  return sessionId;
+    return { sessionId };
+  } catch (error) {
+    return {
+      sessionId,
+      warning:
+        error instanceof Error
+          ? `PR は作成済みですが metadata 保存に失敗しました。local D1 migration を確認してください: ${error.message}`
+          : "PR は作成済みですが metadata 保存に失敗しました。local D1 migration を確認してください。",
+    };
+  }
 }
 
 async function githubRequest<T>(env: Env, path: string): Promise<T> {
