@@ -1,7 +1,13 @@
 export type WebLlmTask = "patch" | "pr_draft" | "branch_review" | "summary" | "risk";
 export type DeviceTier = "none" | "low" | "mid" | "high";
 export type ModelVisibility = "recommended" | "advanced" | "hidden";
-export type ModelCompatibility = "compatible" | "likely_compatible" | "maybe_too_large" | "hidden_by_device" | "artifact_unverified";
+export type ModelCompatibility =
+  | "compatible"
+  | "likely_compatible"
+  | "maybe_too_large"
+  | "hidden_by_device"
+  | "artifact_unverified"
+  | "failed_on_device";
 
 export type WebLlmDeviceProfile = {
   adapterDetail: string;
@@ -191,6 +197,7 @@ export async function detectWebLlmDeviceProfile(): Promise<WebLlmDeviceProfile> 
 
 export function rankWebLlmModels(input: {
   device: WebLlmDeviceProfile;
+  failedModelIds?: Set<string>;
   task: WebLlmTask;
   verifiedModelIds?: Set<string>;
 }) {
@@ -199,9 +206,12 @@ export function rankWebLlmModels(input: {
       const taskFit = model.tasks.includes(input.task);
       const deviceFit = tierRank[input.device.tier] >= tierRank[model.minDeviceTier];
       const storageFit = !input.device.storageQuota || input.device.storageQuota / 1_000_000 > model.estimatedDownloadMb * 1.5;
+      const failedOnDevice = input.failedModelIds?.has(model.id);
       const verified = input.verifiedModelIds?.has(model.id);
       const compatibility: ModelCompatibility = !input.device.webGpuAvailable
         ? "hidden_by_device"
+        : failedOnDevice
+          ? "failed_on_device"
         : !deviceFit || !storageFit
           ? "maybe_too_large"
           : model.status === "experimental"
@@ -217,10 +227,11 @@ export function rankWebLlmModels(input: {
         model.japaneseScore * (input.task === "pr_draft" || input.task === "branch_review" ? 2 : 1) +
         model.speedScore +
         (verified ? 20 : 0) -
+        (failedOnDevice ? 100 : 0) -
         (compatibility === "maybe_too_large" ? 40 : 0) -
         (compatibility === "artifact_unverified" ? 12 : 0);
       const visibility: ModelVisibility =
-        compatibility === "hidden_by_device" || !taskFit
+        compatibility === "hidden_by_device" || compatibility === "failed_on_device" || !taskFit
           ? "hidden"
           : compatibility === "maybe_too_large" || compatibility === "artifact_unverified"
             ? "advanced"
@@ -245,6 +256,7 @@ export function formatBytes(value?: number) {
 
 function createModelReason(model: WebLlmModelCatalogEntry, compatibility: ModelCompatibility, device: WebLlmDeviceProfile) {
   if (compatibility === "hidden_by_device") return "WebGPU がないため非表示";
+  if (compatibility === "failed_on_device") return "この端末で load に失敗したため非表示";
   if (compatibility === "maybe_too_large") return `${device.tier} tier では ${model.sizeClass} model が重い可能性があります`;
   if (compatibility === "artifact_unverified") return "WebLLM artifact の実 E2E が未確認";
   if (compatibility === "compatible") return "この端末で検証済み";
