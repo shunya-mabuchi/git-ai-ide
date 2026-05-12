@@ -45,6 +45,14 @@ GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY--
 Worker の WebCrypto では PKCS#8 形式の `-----BEGIN PRIVATE KEY-----` を想定しています。
 `-----BEGIN RSA PRIVATE KEY-----` の場合は PKCS#8 に変換してから設定します。
 
+Node.js で変換する例:
+
+```bash
+node -e "const fs=require('fs'); const crypto=require('crypto'); const input='private-notes/secrets/git-ai-ide.private-key.pem'; const output='private-notes/secrets/git-ai-ide.pkcs8.private-key.pem'; const key=crypto.createPrivateKey(fs.readFileSync(input,'utf8')); fs.writeFileSync(output, key.export({type:'pkcs8',format:'pem'}));"
+```
+
+`.pem` は repository に commit せず、`private-notes/secrets` など `.gitignore` 済みの場所に置きます。
+
 Worker を起動します。
 
 ```bash
@@ -74,14 +82,21 @@ secret 未設定時は demo mode を返します。これにより、GitHub App 
 
 1. GitHub App を対象 repository のみに install する
 2. `apps/worker/.dev.vars` に `GITHUB_APP_ID`、`GITHUB_APP_SLUG`、`GITHUB_APP_PRIVATE_KEY` を設定する
-3. `pnpm dev:worker` で Worker を起動する
-4. `pnpm dev` で Web app を起動する
-5. GitHub Integration で installation と repository を選択する
-6. Branch Goal を設定し、作業 branch を作成する
-7. Patch Queue の Safety Checklist を満たす
-8. Branch push を実行し、GitHub 上に branch が作成されることを確認する
-9. PR を作成し、PR URL が表示されることを確認する
-10. PR body に `Closes #<issue番号>` が入り、merge 後に対象 issue が close されることを確認する
+3. local D1 に migration を適用する
+4. `pnpm dev:worker` で Worker を起動する
+5. `pnpm dev` で Web app を起動する
+6. GitHub Integration で installation と repository を選択する
+7. Branch Goal を設定し、作業 branch を作成する
+8. Patch Queue の Safety Checklist を満たす
+9. Branch push を実行し、GitHub 上に branch が作成されることを確認する
+10. PR を作成し、PR URL が表示されることを確認する
+11. PR body に `Closes #<issue番号>` が入り、merge 後に対象 issue が close されることを確認する
+
+local D1 migration:
+
+```bash
+pnpm --filter @git-ai-ide/worker exec wrangler d1 migrations apply git-ai-ide --local
+```
 
 期待する状態:
 
@@ -105,6 +120,13 @@ GIT_AI_IDE_REAL_GITHUB_E2E=1 VITE_GIT_AI_IDE_WORKER_URL=http://127.0.0.1:8787 pn
 ```
 
 この harness は Web app と同じ Worker URL に対して setup / installations / repositories を確認し、selected repository mode へ入れる前提を自動検証します。
+
+実績:
+
+- `installation_id: 131652249`
+- selected repository: `shunya-mabuchi/git-ai-ide`
+- PR #79 を Worker API から作成
+- PR #79 merge 後、`Closes #77` により issue #77 が close 済み
 
 branch push と PR 作成まで確認する場合だけ、明示的に書き込みを有効にします。
 
