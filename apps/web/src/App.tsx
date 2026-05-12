@@ -1821,19 +1821,6 @@ export function App() {
               </div>
             ) : editorView === "preview" && previewTabOpen ? (
               <div className="editor-preview-card">
-                <div className="editor-toolbar">
-                  <span>Local Preview</span>
-                  <button
-                    className="icon-button"
-                    aria-label="Preview tab を閉じる"
-                    onClick={() => {
-                      setPreviewTabOpen(false);
-                      setEditorView("file");
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
                 <LocalPreviewPanel
                   previewAvailable={previewAvailable}
                   previewCommand={previewCommand}
