@@ -52,6 +52,7 @@ type FileName = string;
 type SidePanelMode = "explorer" | "search" | "git";
 type BottomPanelMode = "problems" | "terminal" | "preview" | "output";
 type DiffMode = "patch" | "file";
+type EditorView = "file" | "preview";
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
 type TaskPriority = "fast" | "balanced" | "deep";
@@ -156,6 +157,8 @@ export function App() {
   const [previewRunState, setPreviewRunState] = useState<"idle" | "running" | "ready">("idle");
   const [previewLog, setPreviewLog] = useState("Local Preview はまだ起動していません。");
   const [previewMode, setPreviewMode] = useState<"candidate" | "recorded" | "webcontainer">("candidate");
+  const [previewTabOpen, setPreviewTabOpen] = useState(false);
+  const [editorView, setEditorView] = useState<EditorView>("file");
   const [previewUrl, setPreviewUrl] = useState("");
   const [prDraftGenerated, setPrDraftGenerated] = useState(false);
   const [prDraftMode, setPrDraftMode] = useState<PrDraftMode>("preview");
@@ -787,6 +790,7 @@ export function App() {
   const openFile = (file: FileName) => {
     if (!file) return;
     setSelectedFile(file);
+    setEditorView("file");
     setOpenFiles((currentFiles) => (currentFiles.includes(file) ? currentFiles : [...currentFiles, file]));
   };
 
@@ -987,8 +991,9 @@ export function App() {
 
   const runLocalPreview = async () => {
     setPreviewRunState("running");
-    setBottomPanelMode("preview");
-    setBottomPanelCollapsed(false);
+    setPreviewTabOpen(true);
+    setEditorView("preview");
+    setDiffOpen(false);
     setPreviewUrl("");
     setPreviewMode("candidate");
     setPreviewLog("Git AI IDE Local Preview\npreview を起動中...");
@@ -1665,11 +1670,12 @@ export function App() {
             ) : null}
             {openFiles.map((file) => (
               <button
-                className={!diffOpen && file === selectedFile ? "tab active" : "tab"}
+                className={!diffOpen && editorView === "file" && file === selectedFile ? "tab active" : "tab"}
                 key={file}
                 onClick={() => {
                   setSelectedFile(file);
                   setDiffOpen(false);
+                  setEditorView("file");
                 }}
               >
                 <span>{basename(file)}</span>
@@ -1682,6 +1688,25 @@ export function App() {
                 />
               </button>
             ))}
+            {previewTabOpen ? (
+              <button
+                className={!diffOpen && editorView === "preview" ? "tab active preview-tab" : "tab preview-tab"}
+                onClick={() => {
+                  setDiffOpen(false);
+                  setEditorView("preview");
+                }}
+              >
+                <span>Preview</span>
+                <X
+                  size={13}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setPreviewTabOpen(false);
+                    setEditorView("file");
+                  }}
+                />
+              </button>
+            ) : null}
           </div>
 
           <div className="editor-surface">
@@ -1713,6 +1738,32 @@ export function App() {
                     ) : null}
                   </div>
                 </div>
+              </div>
+            ) : editorView === "preview" && previewTabOpen ? (
+              <div className="editor-preview-card">
+                <div className="editor-toolbar">
+                  <span>Local Preview</span>
+                  <button
+                    className="icon-button"
+                    aria-label="Preview tab を閉じる"
+                    onClick={() => {
+                      setPreviewTabOpen(false);
+                      setEditorView("file");
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <LocalPreviewPanel
+                  previewAvailable={previewAvailable}
+                  previewCommand={previewCommand}
+                  previewLog={previewLog}
+                  previewMode={previewMode}
+                  previewPreflight={previewPreflight}
+                  previewRunState={previewRunState}
+                  previewUrl={previewUrl}
+                  workspaceName={workspaceName}
+                />
               </div>
             ) : (
               <div className="editor-card">
@@ -2038,6 +2089,72 @@ export function App() {
 
 function PanelTitle({ title }: { title: string }) {
   return <h2 className="panel-title">{title}</h2>;
+}
+
+function LocalPreviewPanel({
+  previewAvailable,
+  previewCommand,
+  previewLog,
+  previewMode,
+  previewPreflight,
+  previewRunState,
+  previewUrl,
+  workspaceName,
+}: {
+  previewAvailable: boolean;
+  previewCommand: string | undefined;
+  previewLog: string;
+  previewMode: "candidate" | "recorded" | "webcontainer";
+  previewPreflight: ReturnType<typeof createLocalPreviewPreflight>;
+  previewRunState: "idle" | "running" | "ready";
+  previewUrl: string;
+  workspaceName: string;
+}) {
+  const resolvedPreviewMode =
+    previewMode === "webcontainer"
+      ? "WebContainer iframe"
+      : previewMode === "recorded"
+        ? "Recorded fallback"
+        : previewPreflight.canAttemptWebContainer
+          ? "WebContainer candidate"
+          : "Recorded fallback";
+
+  return (
+    <div className="preview-panel">
+      <div className="preview-info">
+        <strong>{previewAvailable ? "Local Preview" : "Preview command 未検出"}</strong>
+        <span>{previewAvailable ? `${previewCommand} を使って確認します` : "package.json に dev または preview script がありません。"}</span>
+        <span>mode: {resolvedPreviewMode}</span>
+        <span>{previewPreflight.reason}</span>
+        {previewUrl ? <a href={previewUrl}>{previewUrl}</a> : null}
+        <ul className="preview-preflight">
+          {previewPreflight.items.map((item) => (
+            <li className={`preview-preflight-${item.status}`} key={item.id}>
+              {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "warning" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+              <span>
+                <strong>{item.label}</strong>
+                {item.detail}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {previewUrl ? (
+        <iframe className="preview-iframe" title={`${workspaceName} preview`} src={previewUrl} />
+      ) : (
+        <div className="preview-frame">
+          <strong>{workspaceName}</strong>
+          <span>{previewRunState === "ready" ? "Preview ready" : previewRunState === "running" ? "Preview starting" : "Preview idle"}</span>
+          <p>
+            {previewAvailable
+              ? "対応環境では dev server の URL を取得し、この領域に iframe として表示します。非対応環境では recorded fallback として確認手順を表示します。"
+              : "この repo では自動 preview の候補がないため、AI は確認手順を提案する fallback に切り替えます。"}
+          </p>
+        </div>
+      )}
+      <pre className="preview-log">{previewLog}</pre>
+    </div>
+  );
 }
 
 function ExplorerTree({

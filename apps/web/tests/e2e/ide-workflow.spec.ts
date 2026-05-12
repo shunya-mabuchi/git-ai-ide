@@ -46,4 +46,19 @@ test.describe("Git AI IDE workflow", () => {
     }
     await expect(memoryEditor).toHaveValue("PR description では reviewer が見る risk と test plan を先に書く。");
   });
+
+  test("Local Preview を editor tab として開き file tab に戻れる", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("button", { name: /Local Preview/ }).click();
+
+    await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
+    await expect(page.locator(".editor-surface .preview-panel")).toBeVisible();
+    await expect(page.locator(".editor-surface")).toContainText("Local Preview");
+
+    await page.locator(".editor-tabs .tab", { hasText: "generateSummary.ts" }).click();
+
+    await expect(page.locator(".editor-surface .lf-monaco-editor")).toBeVisible();
+    await expect(page.locator(".editor-tabs .preview-tab")).toBeVisible();
+  });
 });
