@@ -249,6 +249,17 @@ describe("requestPatchProposal", () => {
 
     const result = await requestPatchProposal({
       branchGoalMarkdown: "# Branch Goal",
+      context: {
+        assistedMemory: "PR draft では reviewer 向けのリスクを先に書く。",
+        branchGoalMarkdown: "# Branch Goal",
+        currentFile: "const title = 'old';",
+        fileCount: 8,
+        gitChangeCount: 2,
+        tokenBudget: {
+          limit: 8_000,
+          used: 2_400,
+        },
+      },
       currentFile: {
         content: "const title = 'old';",
         path: "src/App.tsx",
@@ -268,6 +279,8 @@ describe("requestPatchProposal", () => {
       },
       url: "http://localhost:11434/api/generate",
     });
+    expect((calls[0].body as { prompt: string }).prompt).toContain("AI Context:");
+    expect((calls[0].body as { prompt: string }).prompt).toContain("PR draft では reviewer 向けのリスクを先に書く。");
     expect(result).toMatchObject({
       ok: true,
       mode: "ollama",

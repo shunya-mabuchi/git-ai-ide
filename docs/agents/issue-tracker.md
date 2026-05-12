@@ -42,7 +42,7 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 
 ## GAI-041: Patch Queue の複数案・reject・failed reason を実用化する
 
-- 状態: 実装中
+- 状態: 完了
 - ラベル: `実装可能`, `種別:機能`, `領域:web`, `領域:ai-runtime`, `優先度:p1`
 - 担当: Codex
 - GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/84
@@ -61,6 +61,33 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - 検証:
   - `pnpm --filter @git-ai-ide/web typecheck` 成功
   - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/web test:e2e` 成功
+  - `pnpm --filter @git-ai-ide/web build` 成功
+  - PR #87 を merge 済み
+
+## GAI-042: Local Preview / File UX / AI context の最終実用確認を追加する
+
+- 状態: 実装中
+- ラベル: `実装可能`, `種別:機能`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/82
+- 背景: Local Preview tab、file operations、Context Pack は実装済みだが、完成前に IDE として自然に使えるかを E2E と UI 表示で補強する必要がある。
+- スコープ:
+  - Preview URL bar で localhost を自然に開けることを確認する
+  - rename / delete 後の tab、selected file、Git diff 同期を E2E で確認する
+  - Context Pack に selected file / changed files / priority を明示する
+  - Patch Proposal の Ollama prompt に Context Pack を渡す
+  - PR draft に selected file / priority tier / budget を含める
+- 受け入れ条件:
+  - Preview tab が file tab と同じ感覚で開閉できる
+  - URL bar 入力が iframe preview に反映される
+  - rename / delete 後も Explorer、tab、Git diff が矛盾しない
+  - assisted memory / budget / priority が AI context と PR draft に反映される
+- 検証:
+  - `pnpm --filter @git-ai-ide/web typecheck` 成功
+  - `pnpm --filter @git-ai-ide/web test` 成功
+  - `pnpm --filter @git-ai-ide/ai-runtime typecheck` 成功
+  - `pnpm --filter @git-ai-ide/ai-runtime test` 成功
   - `pnpm --filter @git-ai-ide/web test:e2e` 成功
   - `pnpm --filter @git-ai-ide/web build` 成功
 
