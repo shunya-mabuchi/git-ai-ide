@@ -18,51 +18,45 @@ Git AI IDE の完成定義は「AI と相談しながら、GitHub repo を開き
 - Monaco Diff Preview
 - Runtime Plan
 - Local Preview panel
+- Local Preview tab / URL bar
 - WebContainer preflight checklist
 - PR 作成前 Safety Gate
 - GitHub Integration panel
+- GitHub App local real E2E
+- selected repo の branch 作成 / branch push / PR 作成
 - GitHub PR Flow readiness checklist
 - Recorded AI fallback
+- 複数案 Patch Queue / reject / failed reason
 - Ollama Patch Proposal request boundary
 - Ollama E2E diagnostic UI
 - Cloudflare Worker API boundary
 - D1 schema for workflow metadata
 - 日本語の issue / PR / docs 運用
 
-## 残っている実 E2E
+## 残っている実 E2E / 運用確認
 
 現在の優先順は次の通りです。
 
-1. Local Preview tab 化
-2. GitHub 実操作モード導線
-3. GitHub App 実 credentials E2E
-4. WebContainer iframe preview E2E
-5. Ollama 実 runtime E2E
-6. WebLLM 実モデルロード E2E
+1. Cloudflare deploy URL での Worker / D1 / GitHub App secrets 結合確認
+2. WebContainer iframe preview E2E
+3. Ollama 実 runtime E2E
+4. WebLLM 実モデルロード E2E
 
-Local Preview tab 化と GitHub 実操作モード導線は完了済みです。以降は外部 credentials または実 runtime が必要な E2E です。
+Local Preview tab、GitHub 実操作モード導線、GitHub App local real E2E は完了済みです。以降は deploy 環境、WebGPU、Ollama model など、外部環境に依存する E2E です。
 
-### 1. GitHub App 実 credentials E2E
+### 1. Cloudflare deploy URL 結合確認
 
 目的:
-selected repository だけに対して branch push と PR creation が動くことを確認する。
+Cloudflare Pages / Workers / D1 / GitHub App secrets を本番相当 URL で接続し、local real E2E と同じ flow が成立することを確認する。
 
 作業:
 
 - Cloudflare Worker に `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_SLUG` を設定
-- GitHub App を test repo に install
-- installation 一覧と repository 一覧を UI で確認
-- branch push
-- PR 作成
-- issue close keyword の動作確認
+- D1 migration を適用
+- Pages から Worker API に接続
+- selected repository で branch push / PR 作成 / issue close keyword を確認
 
-現在の blocker:
-
-- `apps/worker/.dev.vars` が未作成
-- GitHub App の実 `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` / `GITHUB_APP_SLUG` が未設定
-- Cloudflare deploy 確認をする場合は Wrangler login が未完了
-
-ローカル E2E は GitHub App credentials と Worker 起動だけで進められます。Cloudflare deploy E2E は Wrangler login と Worker secret 設定が必要です。
+ローカル real E2E は完了済みです。本番公開は最後に行うため、この項目は deploy 直前の確認として残します。
 
 ### 2. WebContainer iframe preview E2E
 

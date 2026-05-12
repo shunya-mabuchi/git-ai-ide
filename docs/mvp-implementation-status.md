@@ -28,47 +28,53 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 - added / modified / deleted の Git status 表示
 - changed file から diff review
 - branch 名編集
+- GitHub App 実操作 mode で branch 作成
 - commit draft 作成
 - commit draft 後に baseline 更新
 - push demo
-- PR 作成 demo
+- GitHub App 実操作 mode で branch push / PR 作成
+- demo mode で PR flow simulation
 
 ### AI workflow safety
 
 - Context Pack budget meter
 - task priority: Fast / Balanced / Deep
+- selected file / changed files / assisted memory を Context Pack に反映
 - runtime routing: Recorded AI / WebLLM / Ollama
 - runtime suggestion
 - editable Branch Goal
 - editable Assisted Memory
 - structured edit patch proposal
-- Patch Queue safety checklist
+- 複数 proposal の Patch Queue、reject、failed reason
 - PR 作成前 Safety Gate
 
 ### Runtime 管理
 
 - package.json から test / typecheck script を推定
 - WebContainer candidate / recorded fallback の runtime plan
+- Local Preview tab
+- URL bar から localhost preview
 - demo test log
 
 ### Cloudflare Worker 境界
 
 - `/health`
 - `/api/sessions`
+- `/api/github/installations`
 - `/api/github/repos`
+- `/api/github/branches`
+- `/api/github/push`
 - `/api/github/prs`
 - D1 には workflow metadata のみ保存
 
-## 現在 demo mode のもの
+## 実 credentials / 実 runtime が必要なもの
 
-- GitHub App 認証
-- GitHub push
-- GitHub PR 作成
 - WebLLM 実モデルロード
 - Ollama 実接続
 - WebContainer 実行
+- Cloudflare deploy URL での GitHub App / Worker / D1 結合確認
 
-これらは UI と型境界を先に実装してあり、次に実 API / runtime を差し替える想定です。
+GitHub App の local real E2E は完了済みです。WebLLM / Ollama / WebContainer は端末やブラウザ機能に依存するため、通常 CI では fallback を確認し、対応環境で明示的に実 E2E を実行します。
 
 ## 設計上のポイント
 
@@ -80,10 +86,8 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 
 ## 次に本物化する順番
 
-1. GitHub App install / OAuth callback
-2. Worker で GitHub installation token を取得
-3. 選択 repo の branch 作成、push、PR 作成
-4. WebLLM model loading
-5. Ollama localhost 接続
-6. WebContainer install / test / typecheck 実行
-7. isomorphic-git の実 filesystem 連携
+1. Cloudflare deploy URL で Worker / D1 / GitHub App secrets を確認
+2. WebContainer install / dev server iframe preview の実 E2E
+3. WebLLM model loading の実 E2E
+4. Ollama localhost 接続の実 E2E
+5. isomorphic-git の実 filesystem 連携
