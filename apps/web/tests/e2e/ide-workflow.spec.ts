@@ -34,6 +34,19 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByText("Conflict handling")).toBeVisible();
   });
 
+  test("WebLLM model load 診断は WebGPU 非対応環境で fallback reason を表示する", async ({ page }) => {
+    await page.goto("/");
+
+    if (!(await page.getByRole("button", { name: /WebLLM model load 診断/ }).isVisible())) {
+      await page.getByLabel("AI Assistant を表示").click();
+    }
+
+    await page.getByRole("button", { name: /WebLLM model load 診断/ }).click();
+
+    await expect(page.locator(".diagnostic-log").filter({ hasText: "model: Qwen2.5-0.5B-Instruct-q4f16_1-MLC" })).toBeVisible();
+    await expect(page.locator(".diagnostic-log").filter({ hasText: /mode: (recorded|webllm)/ })).toBeVisible();
+  });
+
   test("Assisted Memory を project key ごとに保存して復元できる", async ({ page }) => {
     await page.goto("/");
 
