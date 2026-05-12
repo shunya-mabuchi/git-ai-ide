@@ -17,6 +17,22 @@ export type GitHubInstallationOption = {
   id: number;
 };
 
+export type GitHubBranchOption = {
+  commitSha: string;
+  default: boolean;
+  name: string;
+  protected: boolean;
+};
+
+export type GitHubCommitOption = {
+  author: string;
+  branch: string;
+  message: string;
+  sha: string;
+  time: string;
+  url: string;
+};
+
 export type CreatePullRequestInput = {
   baseBranch: string;
   body: string;
@@ -35,6 +51,13 @@ export type PushFilesInput = {
     status: "added" | "deleted" | "modified";
   }>;
   commitMessage: string;
+  installationId?: number;
+  repository: string;
+};
+
+export type CreateGitHubBranchInput = {
+  baseBranch: string;
+  branch: string;
   installationId?: number;
   repository: string;
 };
@@ -83,6 +106,66 @@ export async function loadGitHubRepositories(installationId?: number): Promise<G
     repositories: GitHubRepositoryOption[];
   };
   return body.repositories;
+}
+
+export async function loadGitHubBranches(input: {
+  defaultBranch?: string;
+  installationId?: number;
+  repository: string;
+}): Promise<GitHubBranchOption[]> {
+  const params = new URLSearchParams({
+    default_branch: input.defaultBranch ?? "main",
+    repository: input.repository,
+  });
+  if (input.installationId) params.set("installation_id", String(input.installationId));
+
+  const response = await fetch(`${workerBaseUrl}/api/github/branches?${params.toString()}`);
+  if (!response.ok) throw new Error("GitHub branches を取得できませんでした。");
+  const body = (await response.json()) as {
+    branches: GitHubBranchOption[];
+  };
+  return body.branches;
+}
+
+export async function createGitHubBranch(input: CreateGitHubBranchInput): Promise<GitHubBranchOption> {
+  const response = await fetch(`${workerBaseUrl}/api/github/branches`, {
+    body: JSON.stringify(input),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.error ?? "GitHub branch を作成できませんでした。");
+  }
+
+  const body = (await response.json()) as {
+    branch: GitHubBranchOption;
+  };
+  return body.branch;
+}
+
+export async function loadGitHubCommits(input: {
+  branch?: string;
+  defaultBranch?: string;
+  installationId?: number;
+  repository: string;
+}): Promise<GitHubCommitOption[]> {
+  const params = new URLSearchParams({
+    branch: input.branch ?? input.defaultBranch ?? "main",
+    default_branch: input.defaultBranch ?? "main",
+    repository: input.repository,
+  });
+  if (input.installationId) params.set("installation_id", String(input.installationId));
+
+  const response = await fetch(`${workerBaseUrl}/api/github/commits?${params.toString()}`);
+  if (!response.ok) throw new Error("GitHub commits を取得できませんでした。");
+  const body = (await response.json()) as {
+    commits: GitHubCommitOption[];
+  };
+  return body.commits;
 }
 
 export async function createGitHubPullRequest(input: CreatePullRequestInput): Promise<CreatePullRequestResult> {
