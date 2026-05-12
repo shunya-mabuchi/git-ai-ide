@@ -673,6 +673,28 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - UI から branch push / PR 作成まで確認する
   - 必要なら Playwright の実 credentials 用 E2E を追加する
 
+## GAI-033: WebContainer iframe preview E2E を完了する
+
+- 状態: 進行中
+- ラベル: `実装可能`, `種別:機能`, `領域:runtime`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/58
+- 背景: Local Preview は Preview tab と iframe 表示まで実装済みだが、cross-origin isolation が有効な環境で WebContainer dev server URL を iframe に接続できることの実 E2E は未完了。
+- スコープ:
+  - WebContainer が必要とする COOP / COEP headers を local preview / deploy で確認できるようにする
+  - Local Preview 実行時に WebContainer mode / dev server URL / iframe 表示を確認する
+  - 非対応環境では recorded fallback と理由表示を維持する
+  - Playwright または手動 E2E 手順で WebContainer iframe preview を確認できるようにする
+- 受け入れ条件:
+  - cross-origin isolation 有効環境で WebContainer preflight が pass になる
+  - Local Preview が WebContainer dev server URL を取得する
+  - Preview tab 内に iframe preview が表示される
+  - 非対応環境では fallback reason が明示され、UI が壊れない
+- 検証:
+  - unit test で preflight と iframe readiness を確認する
+  - Playwright E2E で preview tab / iframe readiness 表示を確認する
+  - deploy 環境で実 WebContainer preview を手動確認する
+
 ## GAI-030: GitHub 実操作モードへの接続導線を明確にする
 
 - 状態: 完了
