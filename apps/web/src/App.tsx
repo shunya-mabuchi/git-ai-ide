@@ -18,7 +18,6 @@ import {
   Play,
   Save,
   Search,
-  ShieldCheck,
   TriangleAlert,
   Trash2,
   X,
@@ -1727,13 +1726,11 @@ export function App() {
         <div className="brand">
           <Code2 size={18} />
           <strong>Git AI IDE</strong>
-          <span>{workspaceName}</span>
         </div>
         <div className="titlebar-center">
-          <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
+          <span className="titlebar-repo">{workspaceName}</span>
           <span><GitBranch size={14} /> {branchName}</span>
-          <span>{extractMarkdownTitle(branchGoalMarkdown) || "Branch Goal"}</span>
-          <span><ShieldCheck size={14} /> {safetyStatus}</span>
+          <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
         </div>
         <div className="titlebar-actions">
           <button className="titlebar-action" onClick={generatePrDraft}><GitPullRequest size={15} /> PR 説明を生成</button>
@@ -1778,52 +1775,20 @@ export function App() {
               {sidePanelMode === "explorer" ? (
                 <>
                   <section className="explorer-section">
-                    <PanelTitle title="Explorer" />
-                    <div className="repo-heading">
-                      <strong>{workspaceName}</strong>
-                      <span>{workspaceRestored ? "IndexedDB から復元" : workspaceSourceLabel(workspaceSource)}</span>
-                    </div>
-                    <div className="workspace-actions">
+                    <div className="panel-heading-row">
+                      <PanelTitle title="Explorer" />
                       <button
-                        className="button secondary"
+                        className="icon-button"
                         disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
+                        title="ローカルフォルダを開く"
                         onClick={openLocalWorkspace}
                       >
-                        {isOpeningWorkspace ? "読み込み中" : "ローカルフォルダを開く"}
+                        <FolderPlus size={15} />
                       </button>
                     </div>
-                    <div className="file-operation-panel">
-                      <label>
-                        <span>New file</span>
-                        <input value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} />
-                      </label>
-                      <button className="icon-action" title="ファイルを作成" onClick={createWorkspaceFile}>
-                        <FilePlus2 size={15} />
-                        <span>作成</span>
-                      </button>
-                      <label>
-                        <span>New folder</span>
-                        <input value={newFolderPath} onChange={(event) => setNewFolderPath(event.target.value)} />
-                      </label>
-                      <button className="icon-action" title="フォルダを作成" onClick={createWorkspaceFolder}>
-                        <FolderPlus size={15} />
-                        <span>作成</span>
-                      </button>
-                      <label>
-                        <span>Rename selected</span>
-                        <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
-                      </label>
-                      <div className="file-operation-actions">
-                        <button className="icon-action" disabled={!selectedFile} title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
-                          <Pencil size={15} />
-                          <span>改名</span>
-                        </button>
-                        <button className="icon-action danger" disabled={!selectedFile} title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
-                          <Trash2 size={15} />
-                          <span>削除</span>
-                        </button>
-                      </div>
-                      <small>{fileOperationMessage}</small>
+                    <div className="repo-heading compact">
+                      <strong>{workspaceName}</strong>
+                      <span>{workspaceRestored ? "Browser Snapshot" : workspaceSourceLabel(workspaceSource)}</span>
                     </div>
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
                     <nav className="file-list">
@@ -1849,16 +1814,51 @@ export function App() {
                         selectedFile={selectedFile}
                       />
                     </nav>
-                  </section>
-
-                  <section className="explorer-section">
-                    <PanelTitle title="Repo Map" />
-                    <div className="repo-map">
-                      <span>{workspaceName} / {fileNames.length} files</span>
-                      <span>capability: {runtimePlan.capability}</span>
-                      <span>test: {runtimePlan.testCommand ?? "not detected"}</span>
-                      <span>typecheck: {runtimePlan.typecheckCommand ?? "not detected"}</span>
-                    </div>
+                    <details className="sidebar-details">
+                      <summary>File actions</summary>
+                      <div className="file-operation-panel">
+                        <label>
+                          <span>New file</span>
+                          <input value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} />
+                        </label>
+                        <button className="icon-action" title="ファイルを作成" onClick={createWorkspaceFile}>
+                          <FilePlus2 size={15} />
+                          <span>作成</span>
+                        </button>
+                        <label>
+                          <span>New folder</span>
+                          <input value={newFolderPath} onChange={(event) => setNewFolderPath(event.target.value)} />
+                        </label>
+                        <button className="icon-action" title="フォルダを作成" onClick={createWorkspaceFolder}>
+                          <FolderPlus size={15} />
+                          <span>作成</span>
+                        </button>
+                        <label>
+                          <span>Rename selected</span>
+                          <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
+                        </label>
+                        <div className="file-operation-actions">
+                          <button className="icon-action" disabled={!selectedFile} title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
+                            <Pencil size={15} />
+                            <span>改名</span>
+                          </button>
+                          <button className="icon-action danger" disabled={!selectedFile} title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
+                            <Trash2 size={15} />
+                            <span>削除</span>
+                          </button>
+                        </div>
+                        <small>{fileOperationMessage}</small>
+                      </div>
+                    </details>
+                    <details className="sidebar-details">
+                      <summary>Repo Map</summary>
+                      <div className="repo-map">
+                        <span>{workspaceName} / {fileNames.length} files</span>
+                        <span>capability: {runtimePlan.capability}</span>
+                        <span>test: {runtimePlan.testCommand ?? "not detected"}</span>
+                        <span>typecheck: {runtimePlan.typecheckCommand ?? "not detected"}</span>
+                      </div>
+                    </details>
                   </section>
                 </>
               ) : null}
@@ -1943,29 +1943,32 @@ export function App() {
                     <span>Branch Goal</span>
                     <strong>{extractMarkdownTitle(branchGoalMarkdown) || "Branch Goal"}</strong>
                   </div>
-                  <PanelTitle title="Branches" />
-                  <div className="branch-list">
-                    {branchSummaries.map((branch) => (
-                      <button
-                        className={branch.status === "current" ? "branch-row active" : "branch-row"}
-                        key={`${branch.role}:${branch.name}`}
-                        onClick={() => {
-                          setBranchName(branch.name);
-                          setBranchPushed(false);
-                          setCreatedPrUrl("");
-                        }}
-                      >
-                        <span>
-                          <GitBranch size={14} />
-                          <strong>{branch.name}</strong>
-                        </span>
-                        <small>{branch.label}</small>
-                        <em>ahead {branch.ahead} / behind {branch.behind}</em>
-                      </button>
-                    ))}
-                  </div>
-                  <PanelTitle title="Merge readiness" />
-                  <div className="merge-panel">
+                  <details className="sidebar-details">
+                    <summary>Branches</summary>
+                    <div className="branch-list">
+                      {branchSummaries.map((branch) => (
+                        <button
+                          className={branch.status === "current" ? "branch-row active" : "branch-row"}
+                          key={`${branch.role}:${branch.name}`}
+                          onClick={() => {
+                            setBranchName(branch.name);
+                            setBranchPushed(false);
+                            setCreatedPrUrl("");
+                          }}
+                        >
+                          <span>
+                            <GitBranch size={14} />
+                            <strong>{branch.name}</strong>
+                          </span>
+                          <small>{branch.label}</small>
+                          <em>ahead {branch.ahead} / behind {branch.behind}</em>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                  <details className="sidebar-details">
+                    <summary>Merge readiness</summary>
+                    <div className="merge-panel">
                     <label className="branch-input compact">
                       <span>Target</span>
                       <input value={mergeTargetBranch} onChange={(event) => setMergeTargetBranch(event.target.value)} />
@@ -1994,20 +1997,23 @@ export function App() {
                         <span>推奨: branch goal に合う出力契約を残し、PR description に解消理由を書きます。</span>
                       </div>
                     ) : null}
-                  </div>
-                  <PanelTitle title="History" />
-                  <div className="history-list">
-                    {commitHistory.map((commit) => (
-                      <button className="history-item" key={`${commit.sha}:${commit.message}`}>
-                        <History size={14} />
-                        <span>
-                          <strong>{commit.message}</strong>
-                          <small>{commit.sha} / {commit.branch} / {commit.author}</small>
-                        </span>
-                        <em>{commit.time}</em>
-                      </button>
-                    ))}
-                  </div>
+                    </div>
+                  </details>
+                  <details className="sidebar-details">
+                    <summary>History</summary>
+                    <div className="history-list">
+                      {commitHistory.map((commit) => (
+                        <button className="history-item" key={`${commit.sha}:${commit.message}`}>
+                          <History size={14} />
+                          <span>
+                            <strong>{commit.message}</strong>
+                            <small>{commit.sha} / {commit.branch} / {commit.author}</small>
+                          </span>
+                          <em>{commit.time}</em>
+                        </button>
+                      ))}
+                    </div>
+                  </details>
                   <PanelTitle title="Changes" />
                   <div className="change-list">
                     {gitStatus.entries.length > 0 ? (
@@ -2048,11 +2054,13 @@ export function App() {
                       {isCreatingPr ? "作成中" : "PR 作成"}
                     </button>
                   </div>
-                  <div className="github-box">
-                    <div className="github-box-heading">
-                      <strong>GitHub Integration</strong>
-                      <span className={realGitHubMode ? "mode-chip real" : "mode-chip setup"}>{githubOperationLabel}</span>
-                    </div>
+                  <details className="sidebar-details">
+                    <summary>GitHub Integration</summary>
+                    <div className="github-box">
+                      <div className="github-box-heading">
+                        <strong>GitHub Integration</strong>
+                        <span className={realGitHubMode ? "mode-chip real" : "mode-chip setup"}>{githubOperationLabel}</span>
+                      </div>
                     {!realGitHubMode ? (
                       <div className="setup-warning">
                         <strong>{localFolderMode ? "Local folder snapshot では GitHub 操作は無効です" : "実 GitHub repository に接続してください"}</strong>
@@ -2139,18 +2147,19 @@ export function App() {
                     <span>{branchPushed ? "branch pushed" : realGitHubMode ? "push pending" : "connect GitHub to push"}</span>
                     {pushedCommitSha ? <span>commit: {pushedCommitSha.slice(0, 12)}</span> : null}
                     {createdPrUrl ? <a href={createdPrUrl}>{createdPrUrl}</a> : null}
-                    <ul className="github-readiness">
-                      {pullRequestFlow.items.map((item) => (
-                        <li className={`github-readiness-${item.status}`} key={item.id}>
-                          {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
-                          <span>
-                            <strong>{item.label}</strong>
-                            {item.detail}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                      <ul className="github-readiness">
+                        {pullRequestFlow.items.map((item) => (
+                          <li className={`github-readiness-${item.status}`} key={item.id}>
+                            {item.status === "pass" ? <CheckCircle2 size={14} /> : item.status === "blocked" ? <TriangleAlert size={14} /> : <Circle size={14} />}
+                            <span>
+                              <strong>{item.label}</strong>
+                              {item.detail}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
                   {commitCreated ? (
                     <div className="commit-box">
                       <strong>Commit draft</strong>

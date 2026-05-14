@@ -33,7 +33,7 @@ button {
   background: #181b20;
   border-bottom: 1px solid #2a2f36;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 180px;
+  grid-template-columns: 170px minmax(0, 1fr) 150px;
   min-width: 0;
   padding: 0 10px;
 }
@@ -70,7 +70,7 @@ button {
 
 .titlebar-center {
   gap: 8px;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
 }
 
@@ -93,6 +93,14 @@ button {
   border-radius: 999px;
   font-size: 11px;
   max-width: 190px;
+}
+
+.titlebar-center .titlebar-repo {
+  background: transparent;
+  border-color: transparent;
+  color: #eef3f6;
+  font-weight: 700;
+  max-width: 420px;
 }
 
 .workspace-source-github {
@@ -118,13 +126,13 @@ button {
 }
 
 .titlebar-action {
-  background: #6fb3d2;
-  border: 0;
+  background: #20262b;
+  border: 1px solid #37424b;
   border-radius: 6px;
-  color: #081016;
+  color: #e6ebef;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   gap: 6px;
   height: 28px;
   justify-content: center;
@@ -222,6 +230,18 @@ button {
   text-transform: uppercase;
 }
 
+.panel-heading-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.panel-heading-row .panel-title {
+  margin: 0;
+}
+
 .assistant-header {
   align-items: center;
   display: flex;
@@ -237,6 +257,12 @@ button {
   display: grid;
   gap: 2px;
   margin-bottom: 10px;
+}
+
+.repo-heading.compact {
+  border-bottom: 1px solid #252b33;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
 }
 
 .repo-heading strong {
@@ -327,6 +353,40 @@ button {
   border: 1px solid #2a2f36;
   border-radius: 6px;
   padding: 10px;
+}
+
+.sidebar-details {
+  border-top: 1px solid #252b33;
+  margin-top: 8px;
+  padding-top: 6px;
+}
+
+.sidebar-details summary {
+  align-items: center;
+  color: #a9b4bf;
+  cursor: pointer;
+  display: flex;
+  font-size: 11px;
+  font-weight: 800;
+  height: 28px;
+  justify-content: space-between;
+  letter-spacing: 0;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.sidebar-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-details summary::after {
+  color: #77838f;
+  content: "+";
+  font-size: 13px;
+}
+
+.sidebar-details[open] summary::after {
+  content: "-";
 }
 
 .search-box {
@@ -539,7 +599,7 @@ button {
   border-radius: 6px;
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 6px;
   padding: 10px;
 }
 

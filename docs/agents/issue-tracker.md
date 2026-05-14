@@ -17,6 +17,33 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
 ```
 
+## GAI-050: IDE レイアウトの情報設計を再構成する
+
+- 状態: 完了
+- ラベル: `実装可能`, `enhancement`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/103
+- 背景: IDE 画面の titlebar / Explorer / Source Control / AI Assistant に状態、操作、診断、説明が同じ優先度で常時表示されており、ユーザーが次に何をすればよいか分かりにくい。
+- スコープ:
+  - titlebar を repo / branch / workspace source / primary action に絞る
+  - Explorer は file tree を主役にし、ファイル操作と Repo Map を折りたたみへ移す
+  - Source Control の Branches / Merge readiness / History / GitHub Integration を折りたたみへ移す
+  - 既存 E2E を新しい情報階層に合わせる
+- 受け入れ条件:
+  - titlebar から Branch Goal / safety detail の常時表示が消える
+  - Explorer の常時入力フォームが消え、file tree が主役になる
+  - Repo Map が Explorer の常時表示から外れる
+  - GitHub / merge / history の詳細情報が必要時に開ける
+  - typecheck / unit tests / build / E2E が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps/web` で `node_modules\.bin\vitest.CMD run` 成功
+  - `apps/web` で `node_modules\.bin\vite.CMD build` 成功
+  - `apps/web` で `node_modules\.bin\playwright.CMD test` 成功
+  - Browser smoke で titlebar の重複表示削除、Explorer の File actions / Repo Map 折りたたみを確認
+- メモ:
+  - shadcn/ui は次段の Command / Dialog / Dropdown / Resizable 導入候補。今回の PR では情報階層の整理を優先する。
+
 ## GAI-049: Local folder snapshot と GitHub repository workflow の境界を明確にする
 
 - 状態: 完了

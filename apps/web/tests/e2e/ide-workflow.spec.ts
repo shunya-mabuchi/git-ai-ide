@@ -5,7 +5,7 @@ test.describe("Git AI IDE workflow", () => {
     await page.goto("/");
 
     await expect(page.getByText(/GitHub App をインストールしてください|GitHub repository を開けます|GitHub repository を選択してください/)).toBeVisible();
-    await expect(page.getByText("Only select repositories")).toBeVisible();
+    await expect(page.getByText("Only select repositories").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "この repo を開く" })).toBeVisible();
     await expect(page.getByText("Demo Source Control")).toHaveCount(0);
     await expect(page.getByText("Demo repository")).toHaveCount(0);
@@ -14,9 +14,10 @@ test.describe("Git AI IDE workflow", () => {
   test("Explorer でファイル操作を行い Git panel で差分と branch context を確認できる", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByText("New file").isVisible())) {
-      await page.getByLabel("Explorer").click();
+    if (!(await page.getByText("File actions").isVisible())) {
+      await page.getByRole("button", { name: "Explorer" }).click();
     }
+    await page.getByText("File actions").click();
     await expect(page.getByText("New file")).toBeVisible();
 
     const newFileInput = page.locator(".file-operation-panel input").first();
@@ -31,6 +32,7 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-folder" })).toBeVisible();
 
     await page.getByLabel("Git").click();
+    await page.locator("summary").filter({ hasText: "GitHub Integration" }).click();
     const githubBox = page.locator(".github-box");
     await expect(page.getByText(/GitHub Source Control|GitHub connection required/)).toBeVisible();
     await expect(page.getByText("Demo Source Control")).toHaveCount(0);
@@ -42,7 +44,7 @@ test.describe("Git AI IDE workflow", () => {
     await expect(setupItems.filter({ hasText: "Selected repository" })).toBeVisible();
     await expect(page.getByText("Branches")).toBeVisible();
     await expect(page.getByText("Merge readiness")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
+    await expect(page.getByText("History")).toBeVisible();
     const closeIssueInput = page.getByLabel("Close issue");
     if (await closeIssueInput.isEnabled()) {
       await closeIssueInput.fill("72");
@@ -53,6 +55,7 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByRole("button", { name: /e2e-note\.md added/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /e2e-folder\/\.gitkeep added/ })).toBeVisible();
 
+    await page.getByText("Merge readiness").click();
     await page.getByRole("button", { name: "fixture 競合" }).click();
     await expect(page.getByText("Conflict handling")).toBeVisible();
   });
@@ -79,9 +82,10 @@ test.describe("Git AI IDE workflow", () => {
   test("rename と delete 後に tab / selected file / Git diff が同期する", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByText("New file").isVisible())) {
-      await page.getByLabel("Explorer").click();
+    if (!(await page.getByText("File actions").isVisible())) {
+      await page.getByRole("button", { name: "Explorer" }).click();
     }
+    await page.getByText("File actions").click();
 
     await page.locator(".file-operation-panel input").nth(2).fill("src/features/pr-summary/renamed-note.md");
     await page.getByTitle("選択中ファイルを改名").click();
