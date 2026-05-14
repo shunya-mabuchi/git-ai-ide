@@ -44,6 +44,30 @@ GitHub Issues と同期するためのローカル Issue 管理です。
 - メモ:
   - shadcn/ui は次段の Command / Dialog / Dropdown / Resizable 導入候補。今回の PR では情報階層の整理を優先する。
 
+## GAI-051: AI Assistant と実行アクションの常時表示を整理する
+
+- 状態: 完了
+- ラベル: `実装可能`, `enhancement`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/105
+- 背景: AI Assistant に context、diagnostics、runtime、preview、patch queue が常時並び、重要度が分かりにくい。PR 説明生成 / Runtime checks / Local Preview もテキストボタンとして目立ちすぎている。
+- スコープ:
+  - titlebar の PR 説明生成を compact icon action にする
+  - bottom panel の Runtime checks / Local Preview を compact icon action にする
+  - Model routing / Runtime plan / E2E diagnostics / Branch goal / Assisted Memory / PR 作成前チェックを折りたたみへ移す
+  - E2E を新しい情報階層に合わせる
+- 受け入れ条件:
+  - AI Assistant の常時表示セクション数が減る
+  - Runtime checks / Local Preview が過剰に目立たない
+  - WebLLM 診断と Assisted Memory は折りたたみを開けば利用できる
+  - typecheck / unit tests / build / E2E が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps/web` で `node_modules\.bin\vitest.CMD run` 成功
+  - `apps/web` で `node_modules\.bin\vite.CMD build` 成功
+  - `apps/web` で `node_modules\.bin\playwright.CMD test` 成功
+  - Browser smoke で AI Assistant の advanced sections が折りたたまれ、titlebar / bottom action が icon 化されたことを確認
+
 ## GAI-049: Local folder snapshot と GitHub repository workflow の境界を明確にする
 
 - 状態: 完了
