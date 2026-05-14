@@ -115,10 +115,6 @@ button {
   color: #f1dfaa !important;
 }
 
-.workspace-source-indexeddb {
-  background: #151a22 !important;
-}
-
 .titlebar-actions {
   display: flex;
   gap: 8px;
@@ -304,6 +300,27 @@ button {
   border-bottom: 1px solid #252b33;
   margin-bottom: 8px;
   padding-bottom: 8px;
+}
+
+.restore-notice {
+  background: #151a20;
+  border: 1px solid #303946;
+  border-radius: 6px;
+  display: grid;
+  gap: 3px;
+  margin-bottom: 8px;
+  padding: 8px;
+}
+
+.restore-notice strong {
+  color: #dbe4ea;
+  font-size: 12px;
+}
+
+.restore-notice span {
+  color: #8f9aa6;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .repo-heading strong {

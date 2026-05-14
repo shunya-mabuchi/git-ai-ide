@@ -20,7 +20,7 @@ Git AI IDE は、AI にコード変更を丸投げするのではなく、Branch
 - GitHub selected repository
 - File System Access API によるローカル directory snapshot 読み込み
 - IndexedDB による前回 workspace 復元
-- local folder / browser snapshot の復元
+- ローカルフォルダと前回 workspace の復元
 
 ### Git workflow
 
