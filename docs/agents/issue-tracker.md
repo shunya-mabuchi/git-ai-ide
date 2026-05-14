@@ -68,6 +68,29 @@ GitHub Issues と同期するためのローカル Issue 管理です。
   - `apps/web` で `node_modules\.bin\playwright.CMD test` 成功
   - Browser smoke で AI Assistant の advanced sections が折りたたまれ、titlebar / bottom action が icon 化されたことを確認
 
+## GAI-052: Browser Snapshot を通常 workspace mode から外す
+
+- 状態: 完了
+- ラベル: `実装可能`, `enhancement`, `領域:web`, `優先度:p1`
+- 担当: Codex
+- GitHub issue: https://github.com/shunya-mabuchi/git-ai-ide/issues/107
+- 背景: Browser Snapshot は IndexedDB からの復元手段であり、GitHub repository / ローカルフォルダと同じ workspace mode として表示すると混乱する。
+- スコープ:
+  - titlebar の workspace source badge から `Browser Snapshot` を外す
+  - Explorer では復元時だけ `前回の作業を復元しました` notice を出す
+  - IndexedDB 復元機能自体は残す
+- 受け入れ条件:
+  - 通常 UI に `Browser Snapshot` badge が出ない
+  - 復元された場合は `前回の作業を復元しました` と分かる
+  - GitHub repository / ローカルフォルダの区別は残る
+  - typecheck / unit tests / build / E2E が通る
+- 検証:
+  - `apps\web\node_modules\.bin\tsc.CMD --noEmit -p apps\web\tsconfig.json` 成功
+  - `apps/web` で `node_modules\.bin\vitest.CMD run` 成功
+  - `apps/web` で `node_modules\.bin\vite.CMD build` 成功
+  - `apps/web` で `node_modules\.bin\playwright.CMD test` 成功
+  - Browser smoke で通常 UI に `Browser Snapshot` が表示されないことを確認
+
 ## GAI-049: Local folder snapshot と GitHub repository workflow の境界を明確にする
 
 - 状態: 完了

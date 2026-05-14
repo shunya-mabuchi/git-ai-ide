@@ -1730,7 +1730,9 @@ export function App() {
         <div className="titlebar-center">
           <span className="titlebar-repo">{workspaceName}</span>
           <span><GitBranch size={14} /> {branchName}</span>
-          <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
+          {workspaceSource !== "indexeddb" ? (
+            <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
+          ) : null}
         </div>
         <div className="titlebar-actions">
           <button className="titlebar-action compact" aria-label="PR 説明を生成" title="PR 説明を生成" onClick={generatePrDraft}>
@@ -1790,8 +1792,14 @@ export function App() {
                     </div>
                     <div className="repo-heading compact">
                       <strong>{workspaceName}</strong>
-                      <span>{workspaceRestored ? "Browser Snapshot" : workspaceSourceLabel(workspaceSource)}</span>
+                      <span>{workspaceSource === "indexeddb" ? "前回の作業" : workspaceSourceLabel(workspaceSource)}</span>
                     </div>
+                    {workspaceRestored && workspaceSource === "indexeddb" ? (
+                      <div className="restore-notice">
+                        <strong>前回の作業を復元しました</strong>
+                        <span>GitHub repository に再接続した状態ではありません。</span>
+                      </div>
+                    ) : null}
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
                     <nav className="file-list">
                       <ExplorerTree
@@ -3135,7 +3143,7 @@ function workspaceSourceLabel(source: WorkspaceSnapshot["source"]) {
   if (source === "empty") return "No Workspace";
   if (source === "github") return "GitHub repository";
   if (source === "local-directory") return "Local folder snapshot";
-  if (source === "indexeddb") return "Browser Snapshot";
+  if (source === "indexeddb") return "前回の作業";
   return "Test Fixture";
 }
 
