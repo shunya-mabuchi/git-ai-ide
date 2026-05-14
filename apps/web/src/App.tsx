@@ -1733,7 +1733,9 @@ export function App() {
           <span className={`workspace-source-badge workspace-source-${workspaceSource}`}>{workspaceSourceLabel(workspaceSource)}</span>
         </div>
         <div className="titlebar-actions">
-          <button className="titlebar-action" onClick={generatePrDraft}><GitPullRequest size={15} /> PR 説明を生成</button>
+          <button className="titlebar-action compact" aria-label="PR 説明を生成" title="PR 説明を生成" onClick={generatePrDraft}>
+            <GitPullRequest size={15} />
+          </button>
         </div>
       </header>
 
@@ -2424,11 +2426,11 @@ export function App() {
               >
                 出力
               </button>
-              <button className="button secondary run-tests" disabled={!patchApplied || testsRun || runtimeRunState === "running"} onClick={runWorkspaceChecks}>
-                <Play size={15} /> {runtimeRunState === "running" ? "実行中" : "Runtime checks"}
+              <button className="icon-action compact run-tests" aria-label="Runtime checks" disabled={!patchApplied || testsRun || runtimeRunState === "running"} title={runtimeRunState === "running" ? "実行中" : "Runtime checks"} onClick={runWorkspaceChecks}>
+                <Play size={15} />
               </button>
-              <button className="button secondary run-tests" disabled={!previewAvailable || previewRunState === "running"} onClick={runLocalPreview}>
-                <Play size={15} /> {previewRunState === "running" ? "起動中" : "Local Preview"}
+              <button className="icon-action compact run-tests" aria-label="Local Preview" disabled={!previewAvailable || previewRunState === "running"} title={previewRunState === "running" ? "起動中" : "Local Preview"} onClick={runLocalPreview}>
+                <Play size={15} />
               </button>
               <button className="button ghost collapse-bottom" onClick={() => setBottomPanelCollapsed((collapsed) => !collapsed)}>
                 {bottomPanelCollapsed ? "開く" : "閉じる"}
@@ -2575,8 +2577,9 @@ export function App() {
                 </dl>
               </section>
 
-              <section className="assistant-section">
-                <PanelTitle title="Model Routing" />
+              <details className="assistant-details">
+                <summary>Model routing</summary>
+                <section className="assistant-section compact">
                 <div className="runtime-grid">
                   {(["webllm"] as VisibleAiRuntimeMode[]).map((runtime) => (
                     <button
@@ -2630,10 +2633,12 @@ export function App() {
                   </button>
                   <pre className="diagnostic-log">{webLlmDiagnosticLog}</pre>
                 </div>
-              </section>
+                </section>
+              </details>
 
-              <section className="assistant-section">
-                <PanelTitle title="Runtime Plan" />
+              <details className="assistant-details">
+                <summary>Runtime plan</summary>
+                <section className="assistant-section compact">
                 <div className="runtime-plan">
                   <span>capability: {runtimePlan.capability}</span>
                   <span>confidence: {runtimePlan.confidence}</span>
@@ -2642,10 +2647,12 @@ export function App() {
                   <span>dev: {runtimePlan.devCommand ?? "not detected"}</span>
                   <span>preview: {runtimePlan.previewCommand ?? "not detected"}</span>
                 </div>
-              </section>
+                </section>
+              </details>
 
-              <section className="assistant-section">
-                <PanelTitle title="E2E Diagnostics" />
+              <details className="assistant-details">
+                <summary>E2E diagnostics</summary>
+                <section className="assistant-section compact">
                 <div className="diagnostic-grid">
                   {(["github", "webllm", "webcontainer"] as const).map((group) => (
                     <div className="diagnostic-group" key={group}>
@@ -2666,19 +2673,23 @@ export function App() {
                     </div>
                   ))}
                 </div>
-              </section>
+                </section>
+              </details>
 
-              <section className="assistant-section">
-                <PanelTitle title="Branch Goal" />
+              <details className="assistant-details">
+                <summary>Branch goal</summary>
+                <section className="assistant-section compact">
                 <textarea
                   className="markdown-editor"
                   value={branchGoalMarkdown}
                   onChange={(event) => setBranchGoalMarkdown(event.target.value)}
                 />
-              </section>
+                </section>
+              </details>
 
-              <section className="assistant-section">
-                <PanelTitle title="Assisted Memory" />
+              <details className="assistant-details">
+                <summary>Assisted Memory</summary>
+                <section className="assistant-section compact">
                 <textarea
                   className="memory-editor"
                   value={assistedMemory}
@@ -2693,7 +2704,8 @@ export function App() {
                   <span>project: {assistedMemoryProjectKey}</span>
                   <span>{memorySavedAt ? `saved: ${formatDateTime(memorySavedAt)}` : memoryStatusMessage}</span>
                 </div>
-              </section>
+                </section>
+              </details>
 
               <section className="assistant-section patch-section">
                 <PanelTitle title="Patch Queue" />
@@ -2747,8 +2759,9 @@ export function App() {
                 </article>
               </section>
 
-              <section className="assistant-section">
-                <PanelTitle title="PR 作成前チェック" />
+              <details className="assistant-details">
+                <summary>PR 作成前チェック</summary>
+                <section className="assistant-section compact">
                 <div className="soft-gate">
                   {safetyGate.items.map((item) => (
                     <span key={item.id}>
@@ -2758,7 +2771,8 @@ export function App() {
                   ))}
                   <span>{createdPrUrl ? <CheckCircle2 size={15} /> : <Circle size={15} />} PR created</span>
                 </div>
-              </section>
+                </section>
+              </details>
             </aside>
           </>
         ) : null}

@@ -104,9 +104,10 @@ test.describe("Git AI IDE workflow", () => {
   test("WebLLM model load 診断は WebGPU 非対応環境で fallback reason を表示する", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByRole("button", { name: /WebLLM model load 診断/ }).isVisible())) {
+    if (!(await page.locator("summary").filter({ hasText: "Model routing" }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();
     }
+    await page.locator("summary").filter({ hasText: "Model routing" }).click();
 
     await page.getByRole("button", { name: /WebLLM model load 診断/ }).click();
 
@@ -117,10 +118,11 @@ test.describe("Git AI IDE workflow", () => {
   test("Assisted Memory を project key ごとに保存して復元できる", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByRole("heading", { name: "Assisted Memory" }).isVisible())) {
+    if (!(await page.locator("summary").filter({ hasText: "Assisted Memory" }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();
     }
-    await expect(page.getByRole("heading", { name: "Assisted Memory" })).toBeVisible();
+    await page.locator("summary").filter({ hasText: "Assisted Memory" }).click();
+    await expect(page.locator("summary").filter({ hasText: "Assisted Memory" })).toBeVisible();
 
     const memoryEditor = page.locator(".memory-editor");
     await memoryEditor.fill("PR description では reviewer が見る risk と test plan を先に書く。");
@@ -128,9 +130,10 @@ test.describe("Git AI IDE workflow", () => {
     await expect(page.getByText("project:")).toBeVisible();
 
     await page.reload();
-    if (!(await page.getByRole("heading", { name: "Assisted Memory" }).isVisible())) {
+    if (!(await page.locator("summary").filter({ hasText: "Assisted Memory" }).isVisible())) {
       await page.getByLabel("AI Assistant を表示").click();
     }
+    await page.locator("summary").filter({ hasText: "Assisted Memory" }).click();
     await expect(memoryEditor).toHaveValue("PR description では reviewer が見る risk と test plan を先に書く。");
   });
 
