@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { PointerEvent } from "react";
+import type { PointerEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react";
 import { createDefaultRuntimeStatus, detectBrowserAiRuntime, planRuntimeFromPackageJson, requestPatchProposal } from "@git-ai-ide/ai-runtime";
@@ -240,6 +240,8 @@ export function App() {
   const [newFolderPath, setNewFolderPath] = useState("src/features/pr-summary/docs");
   const [renameFilePath, setRenameFilePath] = useState("src/features/pr-summary/generateSummary.ts");
   const [pendingFileAction, setPendingFileAction] = useState<PendingFileAction | null>(null);
+  const [pendingFileTargetPath, setPendingFileTargetPath] = useState("");
+  const [pendingFileTargetType, setPendingFileTargetType] = useState<ExplorerNode["type"]>("file");
   const [mergeTargetBranch, setMergeTargetBranch] = useState("main");
   const [conflictFixtureEnabled, setConflictFixtureEnabled] = useState(false);
   const [fileOperationMessage, setFileOperationMessage] = useState("選択中のファイルに対して作成・改名・削除できます。");
@@ -1289,6 +1291,8 @@ export function App() {
   };
 
   const startFileAction = (action: PendingFileAction, targetPath = selectedFile, targetType: ExplorerNode["type"] = "file") => {
+    setPendingFileTargetPath(targetPath);
+    setPendingFileTargetType(targetType);
     if (action === "new-file") {
       setNewFilePath(targetType === "directory" ? `${targetPath}/new-file.md` : suggestSiblingFilePath(targetPath));
     } else if (action === "new-folder") {
@@ -1311,6 +1315,49 @@ export function App() {
       renameWorkspaceFile();
     }
     setPendingFileAction(null);
+  };
+
+  const renderPendingFileAction = (targetPath: string, targetType: ExplorerNode["type"], depth: number) => {
+    if (!pendingFileAction || pendingFileTargetPath !== targetPath || pendingFileTargetType !== targetType) {
+      return null;
+    }
+
+    return (
+      <form
+        className="explorer-inline-action tree-inline-action"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitPendingFileAction();
+        }}
+        style={{ marginLeft: 28 + depth * 14 }}
+      >
+        <input
+          aria-label={pendingFileAction === "new-file" ? "新しいファイル名" : pendingFileAction === "new-folder" ? "新しいフォルダ名" : "新しい名前"}
+          autoFocus
+          value={pendingFileAction === "new-file" ? newFilePath : pendingFileAction === "new-folder" ? newFolderPath : renameFilePath}
+          onChange={(event) => {
+            if (pendingFileAction === "new-file") {
+              setNewFilePath(event.target.value);
+            } else if (pendingFileAction === "new-folder") {
+              setNewFolderPath(event.target.value);
+            } else {
+              setRenameFilePath(event.target.value);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setPendingFileAction(null);
+            }
+          }}
+        />
+        <button className="icon-button" title="確定" type="submit">
+          <CheckCircle2 size={15} />
+        </button>
+        <button className="icon-button" title="キャンセル" type="button" onClick={() => setPendingFileAction(null)}>
+          <X size={15} />
+        </button>
+      </form>
+    );
   };
 
   const toggleSidePanel = (mode: SidePanelMode) => {
@@ -1881,59 +1928,13 @@ export function App() {
                       </div>
                     ) : null}
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
-                    {pendingFileAction ? (
-                      <form
-                        className="explorer-inline-action"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          submitPendingFileAction();
-                        }}
-                      >
-                        <input
-                          aria-label={
-                            pendingFileAction === "new-file"
-                              ? "新しいファイル名"
-                              : pendingFileAction === "new-folder"
-                                ? "新しいフォルダ名"
-                                : "新しい名前"
-                          }
-                          autoFocus
-                          value={
-                            pendingFileAction === "new-file"
-                              ? newFilePath
-                              : pendingFileAction === "new-folder"
-                                ? newFolderPath
-                                : renameFilePath
-                          }
-                          onChange={(event) => {
-                            if (pendingFileAction === "new-file") {
-                              setNewFilePath(event.target.value);
-                            } else if (pendingFileAction === "new-folder") {
-                              setNewFolderPath(event.target.value);
-                            } else {
-                              setRenameFilePath(event.target.value);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              setPendingFileAction(null);
-                            }
-                          }}
-                        />
-                        <button className="icon-button" title="確定" type="submit">
-                          <CheckCircle2 size={15} />
-                        </button>
-                        <button className="icon-button" title="キャンセル" type="button" onClick={() => setPendingFileAction(null)}>
-                          <X size={15} />
-                        </button>
-                      </form>
-                    ) : null}
                     {fileOperationMessage ? <div className="explorer-status">{fileOperationMessage}</div> : null}
                     <nav className="file-list">
                       <ExplorerTree
                         dirtyFiles={dirtyFiles}
                         expandedFolders={expandedFolders}
                         nodes={explorerTree}
+                        renderPendingFileAction={renderPendingFileAction}
                         onSelectFile={(file) => {
                           openFile(file);
                           setDiffOpen(false);
@@ -2941,6 +2942,7 @@ function ExplorerTree({
   onSelectFile,
   onStartFileAction,
   onToggleFolder,
+  renderPendingFileAction,
   selectedFile,
 }: {
   dirtyFiles: Set<string>;
@@ -2951,6 +2953,7 @@ function ExplorerTree({
   onSelectFile: (file: string) => void;
   onStartFileAction: (action: PendingFileAction, targetPath?: string, targetType?: ExplorerNode["type"]) => void;
   onToggleFolder: (folder: string) => void;
+  renderPendingFileAction: (targetPath: string, targetType: ExplorerNode["type"], depth: number) => ReactNode;
   selectedFile: string;
 }) {
   return (
@@ -2966,6 +2969,7 @@ function ExplorerTree({
           onSelectFile={onSelectFile}
           onStartFileAction={onStartFileAction}
           onToggleFolder={onToggleFolder}
+          renderPendingFileAction={renderPendingFileAction}
           selectedFile={selectedFile}
         />
       ))}
@@ -2983,6 +2987,7 @@ function ExplorerTreeNode({
   onSelectFile,
   onStartFileAction,
   onToggleFolder,
+  renderPendingFileAction,
   selectedFile,
 }: {
   depth?: number;
@@ -2994,6 +2999,7 @@ function ExplorerTreeNode({
   onSelectFile: (file: string) => void;
   onStartFileAction: (action: PendingFileAction, targetPath?: string, targetType?: ExplorerNode["type"]) => void;
   onToggleFolder: (folder: string) => void;
+  renderPendingFileAction: (targetPath: string, targetType: ExplorerNode["type"], depth: number) => ReactNode;
   selectedFile: string;
 }) {
   if (node.type === "directory") {
@@ -3026,6 +3032,7 @@ function ExplorerTreeNode({
             </button>
           </span>
         </div>
+        {renderPendingFileAction(node.path, "directory", depth + 1)}
         {expanded
           ? node.children.map((child) => (
               <ExplorerTreeNode
@@ -3039,6 +3046,7 @@ function ExplorerTreeNode({
                 onSelectFile={onSelectFile}
                 onStartFileAction={onStartFileAction}
                 onToggleFolder={onToggleFolder}
+                renderPendingFileAction={renderPendingFileAction}
                 selectedFile={selectedFile}
               />
             ))
@@ -3048,31 +3056,34 @@ function ExplorerTreeNode({
   }
 
   return (
-    <div
-      className={node.path === selectedFile ? "tree-item file-item active" : "tree-item file-item"}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onStartFileAction("rename", node.path, "file");
-      }}
-      style={{ paddingLeft: 28 + depth * 14 }}
-    >
-      <button className="tree-main-action" onClick={() => onSelectFile(node.path)}>
-        <File size={14} />
-        <span>{node.name}</span>
-        {dirtyFiles.has(node.path) ? <span className="dirty-dot" aria-label="未保存の変更" /> : null}
-      </button>
-      <span className="tree-row-actions">
-        <button title="同じ階層にファイルを追加" onClick={() => onStartFileAction("new-file", node.path, "file")}>
-          <FilePlus2 size={13} />
+    <>
+      <div
+        className={node.path === selectedFile ? "tree-item file-item active" : "tree-item file-item"}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onStartFileAction("rename", node.path, "file");
+        }}
+        style={{ paddingLeft: 28 + depth * 14 }}
+      >
+        <button className="tree-main-action" onClick={() => onSelectFile(node.path)}>
+          <File size={14} />
+          <span>{node.name}</span>
+          {dirtyFiles.has(node.path) ? <span className="dirty-dot" aria-label="未保存の変更" /> : null}
         </button>
-        <button title="名前を変更" onClick={() => onStartFileAction("rename", node.path, "file")}>
-          <Pencil size={13} />
-        </button>
-        <button title="削除" onClick={() => onDeleteFile(node.path)}>
-          <Trash2 size={13} />
-        </button>
-      </span>
-    </div>
+        <span className="tree-row-actions">
+          <button title="同じ階層にファイルを追加" onClick={() => onStartFileAction("new-file", node.path, "file")}>
+            <FilePlus2 size={13} />
+          </button>
+          <button title="名前を変更" onClick={() => onStartFileAction("rename", node.path, "file")}>
+            <Pencil size={13} />
+          </button>
+          <button title="削除" onClick={() => onDeleteFile(node.path)}>
+            <Trash2 size={13} />
+          </button>
+        </span>
+      </div>
+      {renderPendingFileAction(node.path, "file", depth)}
+    </>
   );
 }
 

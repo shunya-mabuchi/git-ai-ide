@@ -727,6 +727,11 @@ button {
   padding: 6px;
 }
 
+.tree-inline-action {
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+
 .explorer-inline-action input {
   background: #171a1f;
   border: 1px solid #303640;
