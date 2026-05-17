@@ -14,21 +14,23 @@ test.describe("Git AI IDE workflow", () => {
   test("Explorer でファイル操作を行い Git panel で差分と branch context を確認できる", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByText("File actions").isVisible())) {
+    if (!(await page.locator(".file-list").isVisible())) {
       await page.getByRole("button", { name: "Explorer" }).click();
     }
-    await page.getByText("File actions").click();
-    await expect(page.getByText("New file")).toBeVisible();
 
-    const newFileInput = page.locator(".file-operation-panel input").first();
-    await newFileInput.fill("src/features/pr-summary/e2e-note.md");
-    await page.getByTitle("ファイルを作成").click();
+    const firstFileRow = page.locator(".file-item").first();
+    await firstFileRow.hover();
+    await firstFileRow.locator('button[title="同じ階層にファイルを追加"]').click();
+    await page.getByLabel("新しいファイル名").fill("src/features/pr-summary/e2e-note.md");
+    await page.getByTitle("確定").click();
 
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-note.md" })).toBeVisible();
 
-    const newFolderInput = page.locator(".file-operation-panel input").nth(1);
-    await newFolderInput.fill("src/features/pr-summary/e2e-folder");
-    await page.getByTitle("フォルダを作成").click();
+    const firstFolderRow = page.locator(".folder-item").first();
+    await firstFolderRow.hover();
+    await firstFolderRow.locator('button[title="このフォルダにフォルダを追加"]').click();
+    await page.getByLabel("新しいフォルダ名").fill("src/features/pr-summary/e2e-folder");
+    await page.getByTitle("確定").click();
     await expect(page.locator(".file-list").getByRole("button", { name: "e2e-folder" })).toBeVisible();
 
     await page.getByLabel("Git").click();
@@ -82,18 +84,22 @@ test.describe("Git AI IDE workflow", () => {
   test("rename と delete 後に tab / selected file / Git diff が同期する", async ({ page }) => {
     await page.goto("/?fixture=demo");
 
-    if (!(await page.getByText("File actions").isVisible())) {
+    if (!(await page.locator(".file-list").isVisible())) {
       await page.getByRole("button", { name: "Explorer" }).click();
     }
-    await page.getByText("File actions").click();
 
-    await page.locator(".file-operation-panel input").nth(2).fill("src/features/pr-summary/renamed-note.md");
-    await page.getByTitle("選択中ファイルを改名").click();
+    const selectedFileRow = page.locator(".file-item.active");
+    await selectedFileRow.hover();
+    await selectedFileRow.locator('button[title="名前を変更"]').click();
+    await page.getByLabel("新しい名前").fill("src/features/pr-summary/renamed-note.md");
+    await page.getByTitle("確定").click();
     await expect(page.locator(".editor-tabs .tab", { hasText: "renamed-note.md" })).toBeVisible();
     await expect(page.locator(".file-list").getByRole("button", { name: "renamed-note.md" })).toBeVisible();
 
-    await page.locator(".file-list").getByRole("button", { name: "renamed-note.md" }).click();
-    await page.getByTitle("選択中ファイルを削除").click();
+    const renamedFileRow = page.locator(".file-item", { hasText: "renamed-note.md" });
+    await renamedFileRow.click();
+    await renamedFileRow.hover();
+    await renamedFileRow.locator('button[title="削除"]').click();
     await expect(page.locator(".editor-tabs .tab", { hasText: "Diff: src/features/pr-summary/renamed-note.md" })).toBeVisible();
     await expect(page.locator(".context-pack-details")).toContainText("README.md");
 

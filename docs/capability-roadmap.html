@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Git AI IDE - アーキテクチャとフロー</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0c12;
+        --panel: #11141c;
+        --panel-2: #151923;
+        --panel-3: #191e29;
+        --line: #252b36;
+        --line-soft: rgba(255, 255, 255, 0.06);
+        --text: #e9edf4;
+        --muted: #98a1ae;
+        --faint: #68717e;
+        --yellow: #f4c526;
+        --yellow-soft: rgba(244, 197, 38, 0.16);
+        --cyan: #27c8e8;
+        --cyan-soft: rgba(39, 200, 232, 0.12);
+        --pink: #f05aa8;
+        --violet: #9b6cff;
+        --green: #39d692;
+        --orange: #ff9f32;
+        --slate: #7d8796;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .page {
+        display: grid;
+        gap: 14px;
+        margin: 0 auto;
+        max-width: 1460px;
+        min-height: 100vh;
+        padding: 18px 24px 24px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 7px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        font-size: 18px;
+        letter-spacing: 0;
+        line-height: 1.15;
+        margin: 0;
+      }
+
+      .lead {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.55;
+        margin: 0;
+        max-width: 920px;
+      }
+
+      .legend {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding-top: 2px;
+      }
+
+      .legend-item {
+        align-items: center;
+        color: #c2c8d2;
+        display: inline-flex;
+        font-size: 10px;
+        gap: 5px;
+      }
+
+      .legend-dot {
+        border-radius: 2px;
+        height: 7px;
+        width: 7px;
+      }
+
+      .layout {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        min-height: 670px;
+      }
+
+      .map-panel,
+      .side-card {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .map-panel {
+        min-width: 0;
+        overflow: auto hidden;
+        position: relative;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: 150px 150px 160px 150px 150px 150px 150px;
+        height: 100%;
+        min-height: 670px;
+        position: relative;
+      }
+
+      .lane {
+        border-right: 1px solid rgba(255, 255, 255, 0.035);
+        min-width: 0;
+        padding: 16px 12px;
+        position: relative;
+      }
+
+      .lane:last-child {
+        border-right: 0;
+      }
+
+      .lane-title {
+        color: rgba(255, 255, 255, 0.16);
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+      }
+
+      .node {
+        background: #141922;
+        border: 1px solid rgba(255, 255, 255, 0.035);
+        border-left: 3px solid var(--slate);
+        border-radius: 3px;
+        color: rgba(233, 237, 244, 0.28);
+        height: 32px;
+        padding: 5px 7px;
+        position: absolute;
+        width: 128px;
+        z-index: 4;
+      }
+
+      .node strong {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0;
+        line-height: 1.1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .node span {
+        color: currentColor;
+        display: block;
+        font-size: 8px;
+        line-height: 1.3;
+        opacity: 0.68;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .node.actor {
+        border-left-color: var(--pink);
+      }
+
+      .node.client {
+        border-left-color: var(--cyan);
+      }
+
+      .node.worker {
+        border-left-color: var(--violet);
+      }
+
+      .node.data {
+        border-left-color: var(--orange);
+      }
+
+      .node.runtime {
+        border-left-color: var(--green);
+      }
+
+      .node.external {
+        border-left-color: var(--slate);
+      }
+
+      .node.active {
+        background: #1a1f24;
+        border: 2px solid var(--yellow);
+        box-shadow:
+          0 0 0 1px rgba(244, 197, 38, 0.28),
+          0 0 20px rgba(244, 197, 38, 0.12);
+        color: var(--text);
+        padding: 4px 6px;
+      }
+
+      .node.related {
+        background: rgba(244, 197, 38, 0.055);
+        border-color: rgba(244, 197, 38, 0.3);
+        color: rgba(233, 237, 244, 0.58);
+      }
+
+      .node.related span {
+        color: rgba(212, 185, 76, 0.72);
+      }
+
+      .node.active span {
+        color: #d4b94c;
+        opacity: 0.9;
+      }
+
+      .edge-layer {
+        height: 100%;
+        inset: 0;
+        overflow: visible;
+        pointer-events: none;
+        position: absolute;
+        width: 100%;
+        z-index: 2;
+      }
+
+      .edge {
+        fill: none;
+        opacity: 0.08;
+        stroke: #738096;
+        stroke-linecap: round;
+        stroke-width: 1.5;
+      }
+
+      .edge.active {
+        opacity: 0.92;
+        stroke: var(--yellow);
+        stroke-width: 2;
+      }
+
+      .step-badge {
+        align-items: center;
+        background: var(--yellow);
+        border-radius: 999px;
+        color: #141007;
+        display: none;
+        font-family:
+          Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        height: 18px;
+        justify-content: center;
+        line-height: 1;
+        position: absolute;
+        width: 18px;
+        z-index: 8;
+      }
+
+      .step-badge.active {
+        display: flex;
+      }
+
+      .side {
+        display: grid;
+        gap: 8px;
+        grid-template-rows: minmax(0, auto) minmax(220px, 1fr);
+        min-height: 0;
+        position: sticky;
+        right: 0;
+        top: 18px;
+      }
+
+      .side-card {
+        overflow: hidden;
+        padding: 10px;
+      }
+
+      .side-title {
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin: 0 0 9px;
+        text-transform: uppercase;
+      }
+
+      .flow-list {
+        display: grid;
+        gap: 5px;
+      }
+
+      .flow-button {
+        background: transparent;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--text);
+        cursor: pointer;
+        display: grid;
+        gap: 3px;
+        min-height: 48px;
+        padding: 8px;
+        text-align: left;
+      }
+
+      .flow-button:hover {
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .flow-button.active {
+        background: var(--yellow-soft);
+        border-color: rgba(244, 197, 38, 0.75);
+      }
+
+      .flow-button strong {
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .flow-button span {
+        color: var(--muted);
+        font-size: 9px;
+        line-height: 1.35;
+      }
+
+      .steps {
+        display: grid;
+        gap: 6px;
+      }
+
+      .step {
+        background: #151a24;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 5px;
+        display: grid;
+        gap: 5px;
+        grid-template-columns: 20px minmax(0, 1fr);
+        padding: 8px;
+      }
+
+      .step-num {
+        align-items: center;
+        background: var(--yellow);
+        border-radius: 999px;
+        color: #171000;
+        display: flex;
+        font-family:
+          Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        font-size: 10px;
+        font-weight: 900;
+        height: 18px;
+        justify-content: center;
+        line-height: 1;
+        width: 18px;
+      }
+
+      .step strong {
+        display: block;
+        font-size: 10px;
+        line-height: 1.25;
+        margin-bottom: 3px;
+      }
+
+      .step p {
+        color: var(--muted);
+        font-size: 9px;
+        line-height: 1.45;
+        margin: 0;
+      }
+
+      .clear-button {
+        background: #151a24;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 10px;
+        margin-top: 7px;
+        min-height: 28px;
+        padding: 0 8px;
+      }
+
+      @media (max-width: 760px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .map-panel {
+          overflow-x: auto;
+        }
+
+        .map {
+          min-width: 1060px;
+        }
+
+        .side {
+          grid-template-columns: 1fr 1fr;
+          grid-template-rows: auto;
+          position: static;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <h1>Git AI IDE - アーキテクチャとフロー</h1>
+        <p class="lead">
+          GitHub App、Cloudflare Worker、ブラウザ上の作業領域、WebLLM、WebContainer がどこで関わるかを俯瞰します。
+          右のフローを選ぶと、中央の経路とステップがハイライトされます。
+        </p>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background: var(--pink)"></span>利用者</span>
+          <span class="legend-item"><span class="legend-dot" style="background: var(--cyan)"></span>画面</span>
+          <span class="legend-item"><span class="legend-dot" style="background: var(--violet)"></span>Worker / API</span>
+          <span class="legend-item"><span class="legend-dot" style="background: var(--orange)"></span>保存領域 / データ</span>
+          <span class="legend-item"><span class="legend-dot" style="background: var(--green)"></span>実行環境</span>
+          <span class="legend-item"><span class="legend-dot" style="background: var(--slate)"></span>外部サービス</span>
+        </div>
+      </header>
+
+      <section class="layout">
+        <section class="map-panel" aria-label="アーキテクチャマップ">
+          <div class="map" id="map">
+            <svg id="edgeLayer" class="edge-layer" aria-hidden="true"></svg>
+
+            <div class="lane">
+              <div class="lane-title">利用者</div>
+              <div class="node actor" data-node="end-user" style="top: 72px"><strong>開発者</strong><span>repo 所有者 / 利用者</span></div>
+              <div class="node actor" data-node="local-user" style="top: 228px"><strong>ローカル利用者</strong><span>フォルダ選択</span></div>
+              <div class="node actor" data-node="returning-user" style="top: 284px"><strong>再開する利用者</strong><span>作業を復元</span></div>
+              <div class="node actor" data-node="reviewer" style="top: 420px"><strong>レビュー担当</strong><span>PR 確認</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">画面</div>
+              <div class="node client" data-node="web-app" style="top: 72px"><strong>Git AI IDE 画面</strong><span>Pages のアプリ本体</span></div>
+              <div class="node client" data-node="editor" style="top: 170px"><strong>探索 / エディタ</strong><span>tree / tabs / 操作アイコン</span></div>
+              <div class="node client" data-node="source-control" style="top: 228px"><strong>ソース管理</strong><span>ブランチ / 差分 / gate</span></div>
+              <div class="node client" data-node="preview-tab" style="top: 340px"><strong>プレビュータブ</strong><span>localhost / iframe</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">Worker / API</div>
+              <div class="node worker" data-node="worker-api" style="top: 72px"><strong>Cloudflare Worker</strong><span>GitHub App API</span></div>
+              <div class="node worker" data-node="github-session" style="top: 128px"><strong>インストール状態</strong><span>選択 repo 認証</span></div>
+              <div class="node worker" data-node="patch-api" style="top: 284px"><strong>構造化編集 API</strong><span>patch JSON 検証</span></div>
+              <div class="node worker" data-node="preview-api" style="top: 340px"><strong>プレビュー制御</strong><span>実行可否チェック</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">保存領域 / データ</div>
+              <div class="node data" data-node="d1" style="top: 116px"><strong>Cloudflare D1</strong><span>接続情報 cache</span></div>
+              <div class="node data" data-node="indexeddb" style="top: 170px"><strong>IndexedDB</strong><span>作業 snapshot</span></div>
+              <div class="node data" data-node="context-pack" style="top: 284px"><strong>文脈パック</strong><span>repo map / goal</span></div>
+              <div class="node data" data-node="assisted-memory" style="top: 340px"><strong>補助メモリ</strong><span>project notes</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">AI / 実行環境</div>
+              <div class="node runtime" data-node="webllm" style="top: 170px"><strong>WebLLM</strong><span>ブラウザ内モデル</span></div>
+              <div class="node runtime" data-node="patch-queue" style="top: 228px"><strong>パッチキュー</strong><span>適用 / 却下</span></div>
+              <div class="node runtime" data-node="webcontainer" style="top: 340px"><strong>WebContainer</strong><span>可能な範囲で dev server</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">公開 / 確認</div>
+              <div class="node client" data-node="pr-draft" style="top: 116px"><strong>PR 下書き</strong><span>タイトル / 本文 / close</span></div>
+              <div class="node client" data-node="running-app" style="top: 340px"><strong>起動中アプリ</strong><span>iframe 表示 URL</span></div>
+            </div>
+            <div class="lane">
+              <div class="lane-title">外部サービス</div>
+              <div class="node external" data-node="github-app" style="top: 72px"><strong>GitHub App</strong><span>選択 repo に install</span></div>
+              <div class="node external" data-node="github-api" style="top: 116px"><strong>GitHub API</strong><span>contents / branches / PR</span></div>
+              <div class="node external" data-node="github-pr" style="top: 170px"><strong>Pull Request</strong><span>issue close linkage</span></div>
+              <div class="node external" data-node="localhost" style="top: 340px"><strong>Localhost</strong><span>手動 fallback</span></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="side-card">
+            <h2 class="side-title">フロー</h2>
+            <div class="flow-list" id="flowList"></div>
+            <button class="clear-button" id="clearButton" type="button">選択を解除</button>
+          </section>
+
+          <section class="side-card">
+            <h2 class="side-title">ステップ</h2>
+            <div class="steps" id="steps"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const flows = {
+        github: {
+          title: "GitHub repo を開いて PR 作成",
+          desc: "選択した repo を IDE に読み込み、branch / push / PR まで進める",
+          nodes: [
+            "end-user",
+            "web-app",
+            "worker-api",
+            "github-app",
+            "github-session",
+            "d1",
+            "editor",
+            "source-control",
+            "patch-api",
+            "pr-draft",
+            "github-api",
+            "github-pr",
+          ],
+          edges: ["user-web", "web-worker", "worker-github", "worker-d1", "d1-web", "diff-worker", "worker-pr"],
+          steps: [
+            ["End user -> Git AI IDE web", "ユーザーが GitHub App 接続を開き、selected repository だけを許可する。"],
+            ["Git AI IDE web -> Cloudflare Worker", "Worker が installation と repository 一覧を取得する。"],
+            ["Worker -> GitHub App / API", "秘密鍵は Worker 側だけに置き、ブラウザには token を置かない。"],
+            ["D1 -> 探索 / エディタ", "接続情報と選択 repo を使い、tree、tabs、編集画面を表示する。"],
+            ["Source Control -> PR draft", "branch push 後に PR body を生成し、Closes #issue を含める。"],
+          ],
+        },
+        patch: {
+          title: "AI パッチ提案",
+          desc: "branch goal と文脈パックから小さな構造化編集を提案する",
+          nodes: [
+            "editor",
+            "context-pack",
+            "assisted-memory",
+            "webllm",
+            "patch-queue",
+            "patch-api",
+            "source-control",
+          ],
+          edges: ["web-editor", "editor-ai", "ai-model", "ai-diff", "diff-worker", "memory-d1"],
+          steps: [
+            ["Editor -> Context Pack", "selected files、changed files、branch goal を context にまとめる。"],
+            ["Context Pack -> WebLLM", "PC capability に合う browser model を選び、structured edit JSON を生成する。"],
+            ["WebLLM -> Patch Queue", "複数案を diff preview として積み、部分適用か reject を選べる。"],
+            ["Patch Queue -> Structured edit API", "JSON schema と patch 適用可能性を検証し、失敗理由を表示する。"],
+            ["Structured edit -> Source Control", "適用済み変更を diff / safety gate に反映する。"],
+          ],
+        },
+        preview: {
+          title: "ローカルプレビュー / WebContainer",
+          desc: "IDE 内で画面確認する。WebContainer は best-effort、localhost fallback も持つ",
+          nodes: ["editor", "preview-tab", "preview-api", "webcontainer", "running-app", "localhost"],
+          edges: ["web-preview", "preview-webcontainer", "webcontainer-app"],
+          steps: [
+            ["Editor -> Preview tab", "ファイル tab と同じ感覚で Local Preview tab を開く。"],
+            ["Preview tab -> Preview controller", "package.json、install command、dev command、isolation を診断する。"],
+            ["Preview controller -> WebContainer", "対応 repo なら browser 内で install / dev server を試す。"],
+            ["WebContainer -> Running app", "取得できた dev server URL を iframe に表示する。"],
+            ["Fallback -> Localhost", "動かない場合は理由を出し、URL bar で localhost を iframe 表示する。"],
+          ],
+        },
+        local: {
+          title: "ローカルフォルダを開く",
+          desc: "GitHub 操作なしで、テキストファイルの確認・編集・AI review に使う",
+          nodes: ["local-user", "web-app", "editor", "source-control", "context-pack", "patch-queue", "preview-tab"],
+          edges: ["local-web", "web-editor", "editor-ai", "ai-diff", "web-preview"],
+          steps: [
+            ["Local folder user -> Git AI IDE web", "File System Access API でローカルフォルダを選ぶ。"],
+            ["Git AI IDE 画面 -> 探索 / エディタ", ".gitignore 簡易対応、binary / size guard 後に tree と tabs を表示する。"],
+            ["Editor -> Patch Queue", "GitHub 未接続でも diff preview と patch proposal は使える。"],
+            ["Source Control", "branch / push / PR は disabled にし、理由をボタン近くに表示する。"],
+            ["Preview tab", "WebContainer または localhost で画面確認を試す。"],
+          ],
+        },
+        restore: {
+          title: "前回の作業を復元",
+          desc: "IndexedDB の workspace snapshot から作業を再開する",
+          nodes: ["returning-user", "web-app", "indexeddb", "editor", "patch-queue", "source-control"],
+          edges: ["restore-web", "d1-web", "ai-diff"],
+          steps: [
+            ["Returning user -> Git AI IDE web", "前回の作業を復元する入口を表示する。"],
+            ["IndexedDB -> 探索 / エディタ", "前回開いていたファイル、tabs、patch queue を復元する。"],
+            ["Editor -> Patch Queue", "未適用 proposal と diff を確認する。"],
+            ["Source Control", "source が確定していないため publish はしない。"],
+            ["Switch source", "PR flow が必要なら GitHub repository を開き直す。"],
+          ],
+        },
+      };
+
+      const flowList = document.querySelector("#flowList");
+      const steps = document.querySelector("#steps");
+      const clearButton = document.querySelector("#clearButton");
+      const map = document.querySelector("#map");
+      const edgeLayer = document.querySelector("#edgeLayer");
+
+      const edgeDefinitions = {
+        "user-web": {
+          from: "end-user",
+          to: "web-app",
+          title: "開発者 -> Git AI IDE 画面",
+          body: "ユーザーが IDE を開き、GitHub repository / ローカルフォルダ / 作業復元の入口を選ぶ。",
+        },
+        "web-worker": {
+          from: "web-app",
+          to: "worker-api",
+          title: "Git AI IDE 画面 -> Cloudflare Worker",
+          body: "ブラウザから Worker に GitHub App 操作や repository 読み込みを依頼する。",
+        },
+        "worker-github": {
+          from: "worker-api",
+          to: "github-app",
+          title: "Cloudflare Worker -> GitHub App",
+          body: "Worker 側の秘密鍵で installation token を発行し、選択した repo だけにアクセスする。",
+        },
+        "worker-d1": {
+          from: "worker-api",
+          to: "d1",
+          title: "Cloudflare Worker -> Cloudflare D1",
+          body: "installation、repo selection、短期状態を D1 に保存または参照する。",
+        },
+        "d1-web": {
+          from: "d1",
+          to: "editor",
+          title: "Cloudflare D1 -> 探索 / エディタ",
+          body: "選択済み repository の状態を使い、tree、tabs、編集画面を初期化する。",
+        },
+        "web-editor": {
+          from: "web-app",
+          to: "editor",
+          title: "Git AI IDE 画面 -> 探索 / エディタ",
+          body: "repository snapshot またはローカルフォルダ snapshot を tree に表示する。作成・改名・削除は VS Code 風に Explorer 上のアイコンや context menu に置く。",
+        },
+        "editor-ai": {
+          from: "editor",
+          to: "context-pack",
+          title: "探索 / エディタ -> 文脈パック",
+          body: "選択中ファイル、変更ファイル、branch goal、memory を AI 用 context にまとめる。",
+        },
+        "ai-model": {
+          from: "context-pack",
+          to: "webllm",
+          title: "文脈パック -> WebLLM",
+          body: "PC capability に合うブラウザ内モデルで構造化編集を生成する。",
+        },
+        "ai-diff": {
+          from: "webllm",
+          to: "patch-queue",
+          title: "WebLLM -> パッチキュー",
+          body: "生成された変更案を diff preview として積み、適用 / 却下できるようにする。",
+        },
+        "diff-worker": {
+          from: "patch-queue",
+          to: "patch-api",
+          title: "パッチキュー -> 構造化編集 API",
+          body: "patch JSON と適用可能性を検証し、失敗理由を UI に返す。",
+        },
+        "worker-pr": {
+          from: "patch-api",
+          to: "github-pr",
+          title: "構造化編集 API -> Pull Request",
+          body: "branch push、PR 作成、Closes #issue の紐づけまで進める。",
+        },
+        "web-preview": {
+          from: "web-app",
+          to: "preview-tab",
+          title: "Git AI IDE 画面 -> プレビュータブ",
+          body: "file tab と同じ感覚でローカルプレビュータブを開く。",
+        },
+        "preview-webcontainer": {
+          from: "preview-tab",
+          to: "webcontainer",
+          title: "プレビュータブ -> WebContainer",
+          body: "package.json と isolation を診断し、対応 repo なら browser 内 dev server を起動する。",
+        },
+        "webcontainer-app": {
+          from: "webcontainer",
+          to: "running-app",
+          title: "WebContainer -> 起動中アプリ",
+          body: "取得できた dev server URL を iframe preview として表示する。",
+        },
+        "local-web": {
+          from: "local-user",
+          to: "web-app",
+          title: "ローカル利用者 -> Git AI IDE 画面",
+          body: "File System Access API でローカルフォルダを開く。",
+        },
+        "restore-web": {
+          from: "returning-user",
+          to: "web-app",
+          title: "再開する利用者 -> Git AI IDE 画面",
+          body: "IndexedDB に残った前回 workspace を復元する。",
+        },
+        "memory-d1": {
+          from: "assisted-memory",
+          to: "d1",
+          title: "補助メモリ -> Cloudflare D1",
+          body: "project-specific memory を保存し、次回の文脈パックに使う。",
+        },
+      };
+
+      let activeFlow = "github";
+
+      function renderFlowList() {
+        flowList.innerHTML = "";
+        Object.entries(flows).forEach(([key, flow]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `flow-button ${key === activeFlow ? "active" : ""}`;
+          button.innerHTML = `<strong>${flow.title}</strong><span>${flow.desc}</span>`;
+          button.addEventListener("click", () => {
+            activeFlow = key;
+            render();
+          });
+          flowList.appendChild(button);
+        });
+      }
+
+      function renderSteps() {
+        const flow = flows[activeFlow];
+        steps.innerHTML = flow.edges
+          .map((edgeId) => edgeDefinitions[edgeId])
+          .filter(Boolean)
+          .map(
+            (step, index) => `
+              <article class="step">
+                <span class="step-num">${index + 1}</span>
+                <div>
+                  <strong>${step.title}</strong>
+                  <p>${step.body}</p>
+                </div>
+              </article>
+            `,
+          )
+          .join("");
+      }
+
+      function renderHighlights() {
+        const flow = flows[activeFlow];
+        const activeNodeIds = new Set(
+          flow.edges.flatMap((edgeId) => {
+            const edge = edgeDefinitions[edgeId];
+            return edge ? [edge.from, edge.to] : [];
+          }),
+        );
+        document.querySelectorAll(".node").forEach((node) => {
+          const isActive = activeNodeIds.has(node.dataset.node);
+          const isRelated = !isActive && flow.nodes.includes(node.dataset.node);
+          node.classList.toggle("active", isActive);
+          node.classList.toggle("related", isRelated);
+        });
+        renderActiveEdges(flow.edges);
+      }
+
+      function getNodeRect(nodeId) {
+        const node = document.querySelector(`[data-node="${nodeId}"]`);
+        if (!node) return null;
+        const nodeRect = node.getBoundingClientRect();
+        const mapRect = map.getBoundingClientRect();
+        return {
+          left: nodeRect.left - mapRect.left + map.scrollLeft,
+          right: nodeRect.right - mapRect.left + map.scrollLeft,
+          top: nodeRect.top - mapRect.top + map.scrollTop,
+          bottom: nodeRect.bottom - mapRect.top + map.scrollTop,
+          width: nodeRect.width,
+          height: nodeRect.height,
+        };
+      }
+
+      function getConnectionPoints(fromId, toId) {
+        const from = getNodeRect(fromId);
+        const to = getNodeRect(toId);
+        if (!from || !to) return null;
+
+        const forward = from.left <= to.left;
+        const start = {
+          x: forward ? from.right : from.left,
+          y: from.top + from.height / 2,
+        };
+        const end = {
+          x: forward ? to.left : to.right,
+          y: to.top + to.height / 2,
+        };
+        return { start, end, forward };
+      }
+
+      function makeCurve({ start, end }) {
+        const distance = Math.max(46, Math.abs(end.x - start.x) * 0.48);
+        const direction = start.x <= end.x ? 1 : -1;
+        const c1 = { x: start.x + distance * direction, y: start.y };
+        const c2 = { x: end.x - distance * direction, y: end.y };
+        return `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${end.x} ${end.y}`;
+      }
+
+      function pointOnCurve(start, c1, c2, end, t) {
+        const mt = 1 - t;
+        return {
+          x: mt ** 3 * start.x + 3 * mt ** 2 * t * c1.x + 3 * mt * t ** 2 * c2.x + t ** 3 * end.x,
+          y: mt ** 3 * start.y + 3 * mt ** 2 * t * c1.y + 3 * mt * t ** 2 * c2.y + t ** 3 * end.y,
+        };
+      }
+
+      function badgeRectAt(point) {
+        return {
+          left: point.x - 10,
+          right: point.x + 10,
+          top: point.y - 10,
+          bottom: point.y + 10,
+        };
+      }
+
+      function inflatedNodeRects() {
+        return [...document.querySelectorAll(".node")].map((node) => {
+          const rect = getNodeRect(node.dataset.node);
+          return {
+            left: rect.left - 6,
+            right: rect.right + 6,
+            top: rect.top - 6,
+            bottom: rect.bottom + 6,
+          };
+        });
+      }
+
+      function overlaps(a, b) {
+        return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      }
+
+      function collidesWithNode(point, rects) {
+        const badge = badgeRectAt(point);
+        return rects.some((rect) => overlaps(badge, rect));
+      }
+
+      function tangentOnCurve(start, c1, c2, end, t) {
+        const mt = 1 - t;
+        return {
+          x:
+            3 * mt ** 2 * (c1.x - start.x) +
+            6 * mt * t * (c2.x - c1.x) +
+            3 * t ** 2 * (end.x - c2.x),
+          y:
+            3 * mt ** 2 * (c1.y - start.y) +
+            6 * mt * t * (c2.y - c1.y) +
+            3 * t ** 2 * (end.y - c2.y),
+        };
+      }
+
+      function badgeCandidates(curve) {
+        const positions = [0.5, 0.42, 0.58, 0.32, 0.68, 0.22, 0.78];
+        const candidates = [];
+        positions.forEach((t) => {
+          const point = pointOnCurve(curve.start, curve.c1, curve.c2, curve.end, t);
+          const tangent = tangentOnCurve(curve.start, curve.c1, curve.c2, curve.end, t);
+          const length = Math.hypot(tangent.x, tangent.y) || 1;
+          const normal = { x: -tangent.y / length, y: tangent.x / length };
+          candidates.push(point);
+          [16, -16, 28, -28].forEach((offset) => {
+            candidates.push({
+              x: point.x + normal.x * offset,
+              y: point.y + normal.y * offset,
+            });
+          });
+        });
+        return candidates;
+      }
+
+      function curveForPoints({ start, end }) {
+        const distance = Math.max(46, Math.abs(end.x - start.x) * 0.48);
+        const direction = start.x <= end.x ? 1 : -1;
+        return {
+          start,
+          c1: { x: start.x + distance * direction, y: start.y },
+          c2: { x: end.x - distance * direction, y: end.y },
+          end,
+        };
+      }
+
+      function addStepBadge(index, curve) {
+        const badge = document.createElement("span");
+        badge.className = "step-badge active";
+        badge.textContent = String(index + 1);
+        const nodeRects = inflatedNodeRects();
+        const linePositions = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82];
+        const point =
+          linePositions
+            .map((t) => pointOnCurve(curve.start, curve.c1, curve.c2, curve.end, t))
+            .find((candidate) => !collidesWithNode(candidate, nodeRects)) ??
+          pointOnCurve(curve.start, curve.c1, curve.c2, curve.end, 0.5);
+        badge.style.left = `${point.x - 9}px`;
+        badge.style.top = `${point.y - 9}px`;
+        map.appendChild(badge);
+      }
+
+      function renderActiveEdges(edgeIds) {
+        edgeLayer.innerHTML = "";
+        document.querySelectorAll(".step-badge").forEach((badge) => badge.remove());
+        const width = map.scrollWidth;
+        const height = map.scrollHeight;
+        edgeLayer.style.width = `${width}px`;
+        edgeLayer.style.height = `${height}px`;
+        edgeLayer.setAttribute("viewBox", `0 0 ${width} ${height}`);
+        edgeLayer.setAttribute("width", String(width));
+        edgeLayer.setAttribute("height", String(height));
+
+        edgeIds.forEach((edgeId, index) => {
+          const edge = edgeDefinitions[edgeId];
+          if (!edge) return;
+          const points = getConnectionPoints(edge.from, edge.to);
+          if (!points) return;
+          const curve = curveForPoints(points);
+
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("class", "edge active");
+          path.setAttribute("data-edge", edgeId);
+          path.setAttribute(
+            "d",
+            `M ${curve.start.x} ${curve.start.y} C ${curve.c1.x} ${curve.c1.y}, ${curve.c2.x} ${curve.c2.y}, ${curve.end.x} ${curve.end.y}`,
+          );
+          edgeLayer.appendChild(path);
+          addStepBadge(index, curve);
+        });
+      }
+
+      function render() {
+        renderFlowList();
+        renderSteps();
+        renderHighlights();
+      }
+
+      clearButton.addEventListener("click", () => {
+        document.querySelectorAll(".node, .flow-button").forEach((element) => {
+          element.classList.remove("active");
+          element.classList.remove("related");
+        });
+        edgeLayer.innerHTML = "";
+        document.querySelectorAll(".step-badge").forEach((badge) => badge.remove());
+        steps.innerHTML = "";
+      });
+
+      render();
+      window.addEventListener("resize", () => renderHighlights());
+    </script>
+  </body>
+</html>
