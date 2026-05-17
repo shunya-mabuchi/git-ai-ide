@@ -68,6 +68,7 @@ type SidePanelMode = "explorer" | "search" | "git";
 type BottomPanelMode = "problems" | "terminal" | "preview" | "output";
 type DiffMode = "patch" | "file";
 type EditorView = "file" | "preview";
+type PendingFileAction = "new-file" | "new-folder" | "rename";
 type GitHubSetupState = "checking" | "worker-offline" | "secrets-missing" | "installation-missing" | "repository-missing" | "ready";
 type PrDraftMode = "preview" | "raw";
 type AiRuntimeMode = "recorded" | "webllm" | "ollama";
@@ -238,6 +239,7 @@ export function App() {
   const [newFilePath, setNewFilePath] = useState("src/features/pr-summary/notes.md");
   const [newFolderPath, setNewFolderPath] = useState("src/features/pr-summary/docs");
   const [renameFilePath, setRenameFilePath] = useState("src/features/pr-summary/generateSummary.ts");
+  const [pendingFileAction, setPendingFileAction] = useState<PendingFileAction | null>(null);
   const [mergeTargetBranch, setMergeTargetBranch] = useState("main");
   const [conflictFixtureEnabled, setConflictFixtureEnabled] = useState(false);
   const [fileOperationMessage, setFileOperationMessage] = useState("選択中のファイルに対して作成・改名・削除できます。");
@@ -1178,8 +1180,8 @@ export function App() {
     resetWorkflowAfterFileOperation();
   };
 
-  const deleteWorkspaceFile = () => {
-    if (!selectedFile || files[selectedFile] === undefined) {
+  const deleteWorkspaceFile = (targetFile = selectedFile) => {
+    if (!targetFile || files[targetFile] === undefined) {
       setFileOperationMessage("削除するファイルを Explorer で選択してください。");
       return;
     }
@@ -1189,7 +1191,7 @@ export function App() {
       return;
     }
 
-    const deletedFile = selectedFile;
+    const deletedFile = targetFile;
     const nextFiles = Object.keys(files)
       .filter((file) => file !== deletedFile)
       .sort();
@@ -1215,6 +1217,57 @@ export function App() {
     resetWorkflowAfterFileOperation();
   };
 
+  const deleteWorkspaceFolder = (folderPath: string) => {
+    const filesInFolder = fileNames.filter((file) => file.startsWith(`${folderPath}/`));
+
+    if (filesInFolder.length === 0) {
+      setFileOperationMessage(`${folderPath} に削除できるファイルがありません。`);
+      return;
+    }
+
+    if (Object.keys(files).length <= filesInFolder.length) {
+      setFileOperationMessage("最後のフォルダは削除できません。");
+      return;
+    }
+
+    const nextFiles = fileNames.filter((file) => !filesInFolder.includes(file));
+    const fallbackFile = selectedFile && !filesInFolder.includes(selectedFile) ? selectedFile : nextFiles[0] ?? "";
+
+    setFiles((currentFiles) => {
+      const next = { ...currentFiles };
+      filesInFolder.forEach((file) => {
+        delete next[file];
+      });
+      return next;
+    });
+    setSavedFiles((currentFiles) => {
+      const next = { ...currentFiles };
+      filesInFolder.forEach((file) => {
+        delete next[file];
+      });
+      return next;
+    });
+    setOpenFiles((currentFiles) => {
+      const remainingOpenFiles = currentFiles.filter((file) => !filesInFolder.includes(file));
+      return remainingOpenFiles.length > 0 ? remainingOpenFiles : [fallbackFile];
+    });
+    setExpandedFolders((current) => {
+      const next = new Set(current);
+      [...next].forEach((folder) => {
+        if (folder === folderPath || folder.startsWith(`${folderPath}/`)) {
+          next.delete(folder);
+        }
+      });
+      return next;
+    });
+    setSelectedFile(fallbackFile);
+    setDiffFile(filesInFolder[0] ?? folderPath);
+    setDiffMode("file");
+    setDiffOpen(true);
+    setFileOperationMessage(`${folderPath} を削除しました。`);
+    resetWorkflowAfterFileOperation();
+  };
+
   const saveCurrentFile = () => {
     if (!selectedFile || files[selectedFile] === undefined) {
       setFileOperationMessage("保存するファイルを Explorer で選択してください。");
@@ -1233,6 +1286,31 @@ export function App() {
     setSavedFiles(files);
     setLastSavedAt(new Date().toISOString());
     setFileOperationMessage(`${dirtyFiles.size} 件の未保存変更を保存しました。`);
+  };
+
+  const startFileAction = (action: PendingFileAction, targetPath = selectedFile, targetType: ExplorerNode["type"] = "file") => {
+    if (action === "new-file") {
+      setNewFilePath(targetType === "directory" ? `${targetPath}/new-file.md` : suggestSiblingFilePath(targetPath));
+    } else if (action === "new-folder") {
+      setNewFolderPath(targetType === "directory" ? `${targetPath}/new-folder` : suggestSiblingFolderPath(targetPath));
+    } else if (targetPath) {
+      setRenameFilePath(targetPath);
+      if (targetType === "file") {
+        setSelectedFile(targetPath);
+      }
+    }
+    setPendingFileAction(action);
+  };
+
+  const submitPendingFileAction = () => {
+    if (pendingFileAction === "new-file") {
+      createWorkspaceFile();
+    } else if (pendingFileAction === "new-folder") {
+      createWorkspaceFolder();
+    } else if (pendingFileAction === "rename") {
+      renameWorkspaceFile();
+    }
+    setPendingFileAction(null);
   };
 
   const toggleSidePanel = (mode: SidePanelMode) => {
@@ -1781,14 +1859,16 @@ export function App() {
                   <section className="explorer-section">
                     <div className="panel-heading-row">
                       <PanelTitle title="Explorer" />
-                      <button
-                        className="icon-button"
-                        disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
-                        title="ローカルフォルダを開く"
-                        onClick={openLocalWorkspace}
-                      >
-                        <FolderPlus size={15} />
-                      </button>
+                      <div className="explorer-toolbar-actions" aria-label="Explorer actions">
+                        <button
+                          className="icon-button"
+                          disabled={!supportsLocalDirectoryAccess() || isOpeningWorkspace}
+                          title="ローカルフォルダを開く"
+                          onClick={openLocalWorkspace}
+                        >
+                          <FolderOpen size={15} />
+                        </button>
+                      </div>
                     </div>
                     <div className="repo-heading compact">
                       <strong>{workspaceName}</strong>
@@ -1801,6 +1881,54 @@ export function App() {
                       </div>
                     ) : null}
                     {workspaceError ? <div className="workspace-error">{workspaceError}</div> : null}
+                    {pendingFileAction ? (
+                      <form
+                        className="explorer-inline-action"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          submitPendingFileAction();
+                        }}
+                      >
+                        <input
+                          aria-label={
+                            pendingFileAction === "new-file"
+                              ? "新しいファイル名"
+                              : pendingFileAction === "new-folder"
+                                ? "新しいフォルダ名"
+                                : "新しい名前"
+                          }
+                          autoFocus
+                          value={
+                            pendingFileAction === "new-file"
+                              ? newFilePath
+                              : pendingFileAction === "new-folder"
+                                ? newFolderPath
+                                : renameFilePath
+                          }
+                          onChange={(event) => {
+                            if (pendingFileAction === "new-file") {
+                              setNewFilePath(event.target.value);
+                            } else if (pendingFileAction === "new-folder") {
+                              setNewFolderPath(event.target.value);
+                            } else {
+                              setRenameFilePath(event.target.value);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              setPendingFileAction(null);
+                            }
+                          }}
+                        />
+                        <button className="icon-button" title="確定" type="submit">
+                          <CheckCircle2 size={15} />
+                        </button>
+                        <button className="icon-button" title="キャンセル" type="button" onClick={() => setPendingFileAction(null)}>
+                          <X size={15} />
+                        </button>
+                      </form>
+                    ) : null}
+                    {fileOperationMessage ? <div className="explorer-status">{fileOperationMessage}</div> : null}
                     <nav className="file-list">
                       <ExplorerTree
                         dirtyFiles={dirtyFiles}
@@ -1810,6 +1938,9 @@ export function App() {
                           openFile(file);
                           setDiffOpen(false);
                         }}
+                        onStartFileAction={startFileAction}
+                        onDeleteFile={deleteWorkspaceFile}
+                        onDeleteFolder={deleteWorkspaceFolder}
                         onToggleFolder={(folder) => {
                           setExpandedFolders((current) => {
                             const next = new Set(current);
@@ -1824,51 +1955,7 @@ export function App() {
                         selectedFile={selectedFile}
                       />
                     </nav>
-                    <details className="sidebar-details">
-                      <summary>File actions</summary>
-                      <div className="file-operation-panel">
-                        <label>
-                          <span>New file</span>
-                          <input value={newFilePath} onChange={(event) => setNewFilePath(event.target.value)} />
-                        </label>
-                        <button className="icon-action" title="ファイルを作成" onClick={createWorkspaceFile}>
-                          <FilePlus2 size={15} />
-                          <span>作成</span>
-                        </button>
-                        <label>
-                          <span>New folder</span>
-                          <input value={newFolderPath} onChange={(event) => setNewFolderPath(event.target.value)} />
-                        </label>
-                        <button className="icon-action" title="フォルダを作成" onClick={createWorkspaceFolder}>
-                          <FolderPlus size={15} />
-                          <span>作成</span>
-                        </button>
-                        <label>
-                          <span>Rename selected</span>
-                          <input value={renameFilePath} onChange={(event) => setRenameFilePath(event.target.value)} />
-                        </label>
-                        <div className="file-operation-actions">
-                          <button className="icon-action" disabled={!selectedFile} title="選択中ファイルを改名" onClick={renameWorkspaceFile}>
-                            <Pencil size={15} />
-                            <span>改名</span>
-                          </button>
-                          <button className="icon-action danger" disabled={!selectedFile} title="選択中ファイルを削除" onClick={deleteWorkspaceFile}>
-                            <Trash2 size={15} />
-                            <span>削除</span>
-                          </button>
-                        </div>
-                        <small>{fileOperationMessage}</small>
-                      </div>
-                    </details>
-                    <details className="sidebar-details">
-                      <summary>Repo Map</summary>
-                      <div className="repo-map">
-                        <span>{workspaceName} / {fileNames.length} files</span>
-                        <span>capability: {runtimePlan.capability}</span>
-                        <span>test: {runtimePlan.testCommand ?? "not detected"}</span>
-                        <span>typecheck: {runtimePlan.typecheckCommand ?? "not detected"}</span>
-                      </div>
-                    </details>
+
                   </section>
                 </>
               ) : null}
@@ -2849,14 +2936,20 @@ function ExplorerTree({
   dirtyFiles,
   expandedFolders,
   nodes,
+  onDeleteFile,
+  onDeleteFolder,
   onSelectFile,
+  onStartFileAction,
   onToggleFolder,
   selectedFile,
 }: {
   dirtyFiles: Set<string>;
   expandedFolders: Set<string>;
   nodes: ExplorerNode[];
+  onDeleteFile: (file: string) => void;
+  onDeleteFolder: (folder: string) => void;
   onSelectFile: (file: string) => void;
+  onStartFileAction: (action: PendingFileAction, targetPath?: string, targetType?: ExplorerNode["type"]) => void;
   onToggleFolder: (folder: string) => void;
   selectedFile: string;
 }) {
@@ -2868,7 +2961,10 @@ function ExplorerTree({
           expandedFolders={expandedFolders}
           key={node.path}
           node={node}
+          onDeleteFile={onDeleteFile}
+          onDeleteFolder={onDeleteFolder}
           onSelectFile={onSelectFile}
+          onStartFileAction={onStartFileAction}
           onToggleFolder={onToggleFolder}
           selectedFile={selectedFile}
         />
@@ -2882,7 +2978,10 @@ function ExplorerTreeNode({
   dirtyFiles,
   expandedFolders,
   node,
+  onDeleteFile,
+  onDeleteFolder,
   onSelectFile,
+  onStartFileAction,
   onToggleFolder,
   selectedFile,
 }: {
@@ -2890,7 +2989,10 @@ function ExplorerTreeNode({
   dirtyFiles: Set<string>;
   expandedFolders: Set<string>;
   node: ExplorerNode;
+  onDeleteFile: (file: string) => void;
+  onDeleteFolder: (folder: string) => void;
   onSelectFile: (file: string) => void;
+  onStartFileAction: (action: PendingFileAction, targetPath?: string, targetType?: ExplorerNode["type"]) => void;
   onToggleFolder: (folder: string) => void;
   selectedFile: string;
 }) {
@@ -2899,11 +3001,31 @@ function ExplorerTreeNode({
 
     return (
       <div className="tree-group">
-        <button className="tree-item folder-item" onClick={() => onToggleFolder(node.path)} style={{ paddingLeft: 8 + depth * 14 }}>
+        <div
+          className="tree-item folder-item"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            onStartFileAction("new-file", node.path, "directory");
+          }}
+          style={{ paddingLeft: 8 + depth * 14 }}
+        >
+          <button className="tree-main-action" onClick={() => onToggleFolder(node.path)}>
           <ChevronRight className={expanded ? "tree-chevron expanded" : "tree-chevron"} size={14} />
           {expanded ? <FolderOpen size={15} /> : <Folder size={15} />}
           <span>{node.name}</span>
-        </button>
+          </button>
+          <span className="tree-row-actions">
+            <button title="このフォルダにファイルを追加" onClick={() => onStartFileAction("new-file", node.path, "directory")}>
+              <FilePlus2 size={13} />
+            </button>
+            <button title="このフォルダにフォルダを追加" onClick={() => onStartFileAction("new-folder", node.path, "directory")}>
+              <FolderPlus size={13} />
+            </button>
+            <button title="フォルダを削除" onClick={() => onDeleteFolder(node.path)}>
+              <Trash2 size={13} />
+            </button>
+          </span>
+        </div>
         {expanded
           ? node.children.map((child) => (
               <ExplorerTreeNode
@@ -2912,7 +3034,10 @@ function ExplorerTreeNode({
                 expandedFolders={expandedFolders}
                 key={child.path}
                 node={child}
+                onDeleteFile={onDeleteFile}
+                onDeleteFolder={onDeleteFolder}
                 onSelectFile={onSelectFile}
+                onStartFileAction={onStartFileAction}
                 onToggleFolder={onToggleFolder}
                 selectedFile={selectedFile}
               />
@@ -2923,15 +3048,31 @@ function ExplorerTreeNode({
   }
 
   return (
-    <button
+    <div
       className={node.path === selectedFile ? "tree-item file-item active" : "tree-item file-item"}
-      onClick={() => onSelectFile(node.path)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onStartFileAction("rename", node.path, "file");
+      }}
       style={{ paddingLeft: 28 + depth * 14 }}
     >
-      <File size={14} />
-      <span>{node.name}</span>
-      {dirtyFiles.has(node.path) ? <span className="dirty-dot" aria-label="未保存の変更" /> : null}
-    </button>
+      <button className="tree-main-action" onClick={() => onSelectFile(node.path)}>
+        <File size={14} />
+        <span>{node.name}</span>
+        {dirtyFiles.has(node.path) ? <span className="dirty-dot" aria-label="未保存の変更" /> : null}
+      </button>
+      <span className="tree-row-actions">
+        <button title="同じ階層にファイルを追加" onClick={() => onStartFileAction("new-file", node.path, "file")}>
+          <FilePlus2 size={13} />
+        </button>
+        <button title="名前を変更" onClick={() => onStartFileAction("rename", node.path, "file")}>
+          <Pencil size={13} />
+        </button>
+        <button title="削除" onClick={() => onDeleteFile(node.path)}>
+          <Trash2 size={13} />
+        </button>
+      </span>
+    </div>
   );
 }
 

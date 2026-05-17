@@ -279,6 +279,28 @@ button {
   margin: 0;
 }
 
+.explorer-toolbar-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.explorer-toolbar-actions .icon-button {
+  color: #a7b2bd;
+  height: 26px;
+  width: 26px;
+}
+
+.explorer-toolbar-actions .icon-button:hover {
+  background: #242a31;
+  color: #e6ebef;
+}
+
+.explorer-toolbar-actions .icon-button.danger:hover {
+  color: #f3a19a;
+}
+
 .assistant-header {
   align-items: center;
   display: flex;
@@ -329,7 +351,6 @@ button {
 }
 
 .repo-heading span,
-.repo-map span,
 .budget span,
 .patch-heading span,
 .bottom-panel span,
@@ -339,7 +360,6 @@ button {
 }
 
 .file-list,
-.repo-map,
 .chat-list,
 .check-list,
 .soft-gate {
@@ -362,10 +382,9 @@ button {
   border: 1px solid transparent;
   border-radius: 5px;
   color: #cbd4dc;
-  cursor: pointer;
   display: grid;
   gap: 6px;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   font-size: 12px;
   height: 28px;
   line-height: 1.3;
@@ -377,14 +396,66 @@ button {
   width: 100%;
 }
 
-.folder-item {
+.tree-main-action {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 6px;
+  grid-template-columns: 14px minmax(0, 1fr);
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.folder-item .tree-main-action {
   grid-template-columns: 14px 15px minmax(0, 1fr);
 }
 
-.tree-item span {
+.tree-main-action span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tree-row-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tree-item:hover .tree-row-actions,
+.tree-item:focus-within .tree-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tree-row-actions button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #9aa6b2;
+  cursor: pointer;
+  display: inline-flex;
+  height: 22px;
+  justify-content: center;
+  padding: 0;
+  width: 22px;
+}
+
+.tree-row-actions button:hover {
+  background: #303741;
+  color: #e6ebef;
+}
+
+.tree-row-actions button:last-child:hover {
+  color: #f3a19a;
 }
 
 .tree-chevron {
@@ -404,13 +475,6 @@ button {
 
 .folder-item {
   color: #d6dee6;
-}
-
-.repo-map {
-  background: #111419;
-  border: 1px solid #2a2f36;
-  border-radius: 6px;
-  padding: 10px;
 }
 
 .sidebar-details {
@@ -651,49 +715,36 @@ button {
   margin-top: 8px;
 }
 
-.file-operation-panel {
+.explorer-inline-action {
+  align-items: center;
   background: #101419;
   border: 1px solid #303640;
   border-radius: 6px;
   display: grid;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 10px;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+  margin: 8px 0;
+  padding: 6px;
 }
 
-.file-operation-panel label {
-  display: grid;
-  gap: 5px;
-}
-
-.file-operation-panel label span,
-.file-operation-panel small {
-  color: #9aa6b2;
-  font-size: 11px;
-}
-
-.file-operation-panel label span {
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.file-operation-panel input {
+.explorer-inline-action input {
   background: #171a1f;
   border: 1px solid #303640;
-  border-radius: 6px;
+  border-radius: 5px;
   color: #e6ebef;
   font: inherit;
   font-size: 12px;
-  height: 30px;
+  height: 28px;
   min-width: 0;
   outline: 0;
   padding: 0 8px;
 }
 
-.file-operation-actions {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 1fr;
+.explorer-status {
+  color: #8f9aa6;
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 6px 0;
 }
 
 .icon-action {
